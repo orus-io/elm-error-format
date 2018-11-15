@@ -71,7 +71,131 @@ formatErrString : String -> Html msg
 formatErrString error =
     String.foldl parseChar (newFormater formaterDefaultOptions) error
         |> parseEOF
+        |> .writer
         |> render
+
+
+
+-- Writer
+
+
+type alias Writer msg =
+    { buffer : Buffer
+    , ignoreNextSpace : Bool
+    , currentLine : List (Html msg)
+    , indent : Int
+    , output : List (Html msg)
+    }
+
+
+newWriter : Writer msg
+newWriter =
+    { buffer = emptyBuffer
+    , ignoreNextSpace = False
+    , currentLine = []
+    , indent = 0
+    , output = []
+    }
+
+
+popBuffer : Writer msg -> ( String, Writer msg )
+popBuffer w =
+    ( w.buffer |> bufferAsString
+    , { w | buffer = emptyBuffer }
+    )
+
+
+appendToBuffer : Char -> Writer msg -> Writer msg
+appendToBuffer c w =
+    case ( w.ignoreNextSpace, c ) of
+        ( True, ' ' ) ->
+            w
+
+        ( _, _ ) ->
+            { w
+                | buffer = bufferAppend c w.buffer
+                , ignoreNextSpace = False
+            }
+
+
+appendSingleSpace : Writer msg -> Writer msg
+appendSingleSpace w =
+    { w
+        | ignoreNextSpace = True
+        , buffer =
+            w.buffer
+                |> bufferRStrip ' '
+                |> bufferAppend ' '
+    }
+
+
+writeText : String -> Writer msg -> Writer msg
+writeText s w =
+    { w
+        | currentLine = List.append w.currentLine [ text s ]
+    }
+
+
+writeColoredText : String -> String -> Writer msg -> Writer msg
+writeColoredText color s w =
+    { w
+        | currentLine =
+            List.append
+                w.currentLine
+                [ span [ style [ ( "color", color ) ] ] [ text s ] ]
+    }
+
+
+flushBufferAsText : Writer msg -> Writer msg
+flushBufferAsText w =
+    let
+        ( s, newW ) =
+            popBuffer w
+    in
+        newW |> writeText s
+
+
+flushBufferAsColoredText : String -> Writer msg -> Writer msg
+flushBufferAsColoredText color w =
+    let
+        ( s, newW ) =
+            popBuffer w
+    in
+        newW |> writeColoredText color s
+
+
+indent : Writer msg -> Writer msg
+indent w =
+    { w
+        | indent = w.indent + 1
+    }
+
+
+unindent : Writer msg -> Writer msg
+unindent w =
+    { w
+        | indent = w.indent - 1
+    }
+
+
+padding : Int -> Attribute msg
+padding indent =
+    style [ ( "padding-left", ((toString (indent * 2)) ++ "rem") ) ]
+
+
+flushCurrentLine : Writer msg -> Writer msg
+flushCurrentLine w =
+    { w
+        | output =
+            List.append w.output
+                [ div [ padding w.indent ] w.currentLine ]
+        , currentLine = []
+    }
+
+
+render : Writer msg -> Html msg
+render w =
+    div [] w.output
 
 
 
@@ -92,11 +216,7 @@ type alias Formater msg =
     , contextStack : List ComplexType
     , stringState : StringState
     , escapeNext : Bool
-    , buffer : Buffer
-    , ignoreNextSpace : Bool
-    , currentLine : List (Html msg)
-    , indent : Int
-    , output : List (Html msg)
+    , writer : Writer msg
     }
 
 
@@ -106,11 +226,7 @@ newFormater options =
     , contextStack = []
     , stringState = NoString
     , escapeNext = False
-    , buffer = emptyBuffer
-    , ignoreNextSpace = False
-    , currentLine = []
-    , indent = 0
-    , output = []
+    , writer = newWriter
     }
 
 
@@ -131,104 +247,11 @@ currentContext f =
     List.head f.contextStack
 
 
-writeText : String -> Formater msg -> Formater msg
-writeText s f =
+formaterWrite : (Writer msg -> Writer msg) -> Formater msg -> Formater msg
+formaterWrite write f =
     { f
-        | currentLine = List.append f.currentLine [ text s ]
+        | writer = write f.writer
     }
-
-
-writeColoredText : String -> String -> Formater msg -> Formater msg
-writeColoredText color s f =
-    { f
-        | currentLine =
-            List.append
-                f.currentLine
-                [ span [ style [ ( "color", color ) ] ] [ text s ] ]
-    }
-
-
-popBuffer : Formater msg -> ( String, Formater msg )
-popBuffer f =
-    ( f.buffer |> bufferAsString
-    , { f | buffer = emptyBuffer }
-    )
-
-
-appendToBuffer : Char -> Formater msg -> Formater msg
-appendToBuffer c f =
-    case ( f.ignoreNextSpace, c ) of
-        ( True, ' ' ) ->
-            f
-
-        ( _, _ ) ->
-            { f
-                | buffer = bufferAppend c f.buffer
-                , ignoreNextSpace = False
-            }
-
-
-appendSingleSpace : Formater msg -> Formater msg
-appendSingleSpace f =
-    { f
-        | ignoreNextSpace = True
-        , buffer =
-            f.buffer
-                |> bufferRStrip ' '
-                |> bufferAppend ' '
-    }
-
-
-flushBufferAsText : Formater msg -> Formater msg
-flushBufferAsText f =
-    let
-        ( s, newF ) =
-            popBuffer f
-    in
-        newF |> writeText s
-
-
-flushBufferAsColoredText : String -> Formater msg -> Formater msg
-flushBufferAsColoredText color f =
-    let
-        ( s, newF ) =
-            popBuffer f
-    in
-        newF |> writeColoredText color s
-
-
-indent : Formater msg -> Formater msg
-indent f =
-    { f
-        | indent = f.indent + 1
-    }
-
-
-unindent : Formater msg -> Formater msg
-unindent f =
-    { f
-        | indent = f.indent - 1
-    }
-
-
-padding : Int -> Attribute msg
-padding indent =
-    style [ ( "padding-left", ((toString (indent * 2)) ++ "rem") ) ]
-
-
-flushCurrentLine : Formater msg -> Formater msg
-flushCurrentLine f =
-    { f
-        | output =
-            List.append f.output
-                [ div [ padding f.indent ] f.currentLine ]
-        , currentLine = []
-    }
-
-
-render : Formater msg -> Html msg
-render f =
-    div [] f.output
 
 
 
@@ -290,31 +313,38 @@ type StringState
 openContext : ComplexType -> Char -> Formater msg -> Formater msg
 openContext t c f =
     f
-        |> flushBufferAsText
-        |> flushCurrentLine
-        |> indent
         |> pushContext t
-        |> appendToBuffer c
-        |> appendSingleSpace
+        |> formaterWrite
+            (flushBufferAsText
+                >> flushCurrentLine
+                >> indent
+                >> appendToBuffer c
+                >> appendSingleSpace
+            )
 
 
 closeContext : ComplexType -> Char -> Formater msg -> Formater msg
 closeContext t c f =
     f
-        |> flushBufferAsText
-        |> flushCurrentLine
-        |> writeText (String.fromChar c)
-        |> flushCurrentLine
         |> popContext
-        |> unindent
+        |> formaterWrite
+            (flushBufferAsText
+                >> flushCurrentLine
+                >> writeText (String.fromChar c)
+                >> flushCurrentLine
+                >> unindent
+            )
 
 
 parseChar : Char -> Formater msg -> Formater msg
 parseChar c f =
     case ( f.stringState, c ) of
         ( _, '\\' ) ->
-            { f | escapeNext = not f.escapeNext }
-                |> appendToBuffer '\\'
+            { f
+                | escapeNext = not f.escapeNext
+            }
+                |> formaterWrite
+                    (appendToBuffer '\\')
 
         ( NoString, '{' ) ->
             f |> openContext Record '{'
@@ -330,43 +360,55 @@ parseChar c f =
 
         ( NoString, '(' ) ->
             f
-                |> appendToBuffer '('
-                |> appendSingleSpace
                 |> pushContext Tuple
+                |> formaterWrite
+                    (appendToBuffer '('
+                        >> appendSingleSpace
+                    )
 
         ( NoString, ')' ) ->
             f
-                |> appendSingleSpace
-                |> appendToBuffer ')'
                 |> popContext
+                |> formaterWrite
+                    (appendSingleSpace
+                        >> appendToBuffer ')'
+                    )
 
         ( NoString, ',' ) ->
             case currentContext f of
                 Just Tuple ->
                     f
-                        |> appendToBuffer ','
-                        |> appendSingleSpace
+                        |> formaterWrite
+                            (appendToBuffer ','
+                                >> appendSingleSpace
+                            )
 
                 _ ->
                     f
-                        |> flushBufferAsText
-                        |> flushCurrentLine
-                        |> appendToBuffer ','
-                        |> appendSingleSpace
+                        |> formaterWrite
+                            (flushBufferAsText
+                                >> flushCurrentLine
+                                >> appendToBuffer ','
+                                >> appendSingleSpace
+                            )
 
         ( NoString, '"' ) ->
             { f | stringState = FirstChar }
-                |> flushBufferAsText
+                |> formaterWrite
+                    flushBufferAsText
 
         ( FirstChar, '"' ) ->
             (if f.escapeNext then
                 { f | escapeNext = False }
-                    |> appendToBuffer '"'
+                    |> formaterWrite
+                        (appendToBuffer '"')
              else
                 { f | stringState = NoString }
-                    |> appendToBuffer '"'
-                    |> appendToBuffer '"'
-                    |> flushBufferAsColoredText f.options.stringColor
+                    |> formaterWrite
+                        (appendToBuffer '"'
+                            >> appendToBuffer '"'
+                            >> flushBufferAsColoredText f.options.stringColor
+                        )
             )
 
         ( FirstChar, c ) ->
@@ -374,25 +416,33 @@ parseChar c f =
                 | stringState = InString
                 , escapeNext = False
             }
-                |> appendToBuffer '"'
-                |> appendToBuffer c
+                |> formaterWrite
+                    (appendToBuffer '"'
+                        >> appendToBuffer c
+                    )
 
         ( InString, '"' ) ->
             if f.escapeNext then
                 { f | escapeNext = False }
-                    |> appendToBuffer '"'
+                    |> formaterWrite
+                        (appendToBuffer '"')
             else
                 { f | stringState = NoString }
-                    |> appendToBuffer '"'
-                    |> flushBufferAsColoredText f.options.stringColor
+                    |> formaterWrite
+                        (appendToBuffer '"'
+                            >> flushBufferAsColoredText f.options.stringColor
+                        )
 
         ( _, c ) ->
             { f | escapeNext = False }
-                |> appendToBuffer c
+                |> formaterWrite
+                    (appendToBuffer c)
 
 
 parseEOF : Formater msg -> Formater msg
 parseEOF f =
     f
-        |> flushBufferAsText
-        |> flushCurrentLine
+        |> formaterWrite
+            (flushBufferAsText
+                >> flushCurrentLine
+            )
