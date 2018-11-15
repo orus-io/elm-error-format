@@ -82,6 +82,7 @@ formatErrString error =
 type alias Formater msg =
     { contextStack : List ComplexType
     , buffer : Buffer
+    , ignoreNextSpace : Bool
     , currentLine : List (Html msg)
     , indent : Int
     , output : List (Html msg)
@@ -92,6 +93,7 @@ newFormater : Formater msg
 newFormater =
     { contextStack = []
     , buffer = []
+    , ignoreNextSpace = False
     , currentLine = []
     , indent = 0
     , output = []
@@ -142,8 +144,22 @@ flushBufferAsText f =
 
 appendToBuffer : Char -> Formater msg -> Formater msg
 appendToBuffer c f =
+    case ( f.ignoreNextSpace, c ) of
+        ( True, ' ' ) ->
+            f
+
+        ( _, _ ) ->
+            { f
+                | buffer = bufferAppend c f.buffer
+                , ignoreNextSpace = False
+            }
+
+
+appendSingleSpace : Formater msg -> Formater msg
+appendSingleSpace f =
     { f
-        | buffer = bufferAppend c f.buffer
+        | ignoreNextSpace = True
+        , buffer = bufferAppend ' ' f.buffer
     }
 
 
@@ -211,11 +227,12 @@ type ComplexType
 openContext : ComplexType -> Char -> Formater msg -> Formater msg
 openContext t c f =
     f
-        |> appendToBuffer c
         |> flushBufferAsText
         |> flushCurrentLine
         |> indent
         |> pushContext t
+        |> appendToBuffer c
+        |> appendSingleSpace
 
 
 closeContext : ComplexType -> Char -> Formater msg -> Formater msg
@@ -223,9 +240,10 @@ closeContext t c f =
     f
         |> flushBufferAsText
         |> flushCurrentLine
+        |> writeText (String.fromChar c)
+        |> flushCurrentLine
         |> popContext
         |> unindent
-        |> appendToBuffer c
 
 
 parseChar : Char -> Formater msg -> Formater msg
@@ -256,13 +274,16 @@ parseChar c f =
         ',' ->
             case currentContext f of
                 Just Tuple ->
-                    f |> appendToBuffer ','
+                    f
+                        |> appendToBuffer ','
+                        |> appendSingleSpace
 
                 _ ->
                     f
-                        |> appendToBuffer ','
                         |> flushBufferAsText
                         |> flushCurrentLine
+                        |> appendToBuffer ','
+                        |> appendSingleSpace
 
         c ->
             f
