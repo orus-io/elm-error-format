@@ -106,7 +106,7 @@ newFormater options =
     , contextStack = []
     , stringState = NoString
     , escapeNext = False
-    , buffer = []
+    , buffer = emptyBuffer
     , ignoreNextSpace = False
     , currentLine = []
     , indent = 0
@@ -150,10 +150,8 @@ writeColoredText color s f =
 
 popBuffer : Formater msg -> ( String, Formater msg )
 popBuffer f =
-    ( String.fromList f.buffer
-    , { f
-        | buffer = []
-      }
+    ( f.buffer |> bufferAsString
+    , { f | buffer = emptyBuffer }
     )
 
 
@@ -174,7 +172,10 @@ appendSingleSpace : Formater msg -> Formater msg
 appendSingleSpace f =
     { f
         | ignoreNextSpace = True
-        , buffer = bufferAppend ' ' f.buffer
+        , buffer =
+            f.buffer
+                |> bufferRStrip ' '
+                |> bufferAppend ' '
     }
 
 
@@ -238,9 +239,32 @@ type alias Buffer =
     List Char
 
 
+emptyBuffer : Buffer
+emptyBuffer =
+    []
+
+
 bufferAppend : Char -> Buffer -> Buffer
 bufferAppend c b =
-    List.append b [ c ]
+    c :: b
+
+
+bufferRStrip : Char -> Buffer -> Buffer
+bufferRStrip c b =
+    case b of
+        h :: t ->
+            if h == c then
+                bufferRStrip c t
+            else
+                b
+
+        b ->
+            b
+
+
+bufferAsString : Buffer -> String
+bufferAsString =
+    List.reverse >> String.fromList
 
 
 
@@ -307,10 +331,12 @@ parseChar c f =
         ( NoString, '(' ) ->
             f
                 |> appendToBuffer '('
+                |> appendSingleSpace
                 |> pushContext Tuple
 
         ( NoString, ')' ) ->
             f
+                |> appendSingleSpace
                 |> appendToBuffer ')'
                 |> popContext
 
