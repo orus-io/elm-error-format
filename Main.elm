@@ -65,7 +65,13 @@ subscriptions model =
 
 view : Model -> Html Msg
 view model =
-    div [ style [ ( "font-family", "monospace" ) ] ] [ formatErrString model ]
+    div
+        [ style
+            [ ( "font-family", "monospace" )
+            , ( "font-size", "0.8rem" )
+            ]
+        ]
+        [ formatErrString model ]
 
 
 formatErrString : String -> Html msg
