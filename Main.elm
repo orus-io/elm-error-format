@@ -3,6 +3,7 @@ module Main exposing (..)
 import Html exposing (Html, Attribute, div, text, span)
 import Html.Attributes exposing (style)
 import Writer exposing (Writer)
+import Json
 
 
 -- MAIN
@@ -101,7 +102,6 @@ type alias Formater =
     , contextStack : List ComplexType
     , stringState : StringState
     , escapeNext : Bool
-    , jsonFormater : JsonFormater
     }
 
 
@@ -111,7 +111,6 @@ newFormater options =
     , contextStack = []
     , stringState = NoString
     , escapeNext = False
-    , jsonFormater = newJsonFormater jsonFormaterDefaultOptions
     }
 
 
@@ -133,56 +132,6 @@ currentContext f =
 
 
 
--- Json Formater
-
-
-type alias JsonFormaterOptions =
-    { stringColor : String }
-
-
-jsonFormaterDefaultOptions : JsonFormaterOptions
-jsonFormaterDefaultOptions =
-    { stringColor = "orangered" }
-
-
-type alias JsonFormater =
-    { options : JsonFormaterOptions
-    , contextStack : List ComplexType
-    , escapeNext : Bool
-    }
-
-
-setJFEscapeNext : Bool -> JsonFormater -> JsonFormater
-setJFEscapeNext v jf =
-    { jf | escapeNext = v }
-
-
-newJsonFormater : JsonFormaterOptions -> JsonFormater
-newJsonFormater options =
-    { options = options
-    , contextStack = []
-    , escapeNext = False
-    }
-
-
-pushJsonContext : ComplexType -> JsonFormater -> JsonFormater
-pushJsonContext t f =
-    { f
-        | contextStack = t :: f.contextStack
-    }
-
-
-popJsonContext : JsonFormater -> JsonFormater
-popJsonContext f =
-    { f | contextStack = List.drop 1 f.contextStack }
-
-
-currentJsonContext : JsonFormater -> Maybe ComplexType
-currentJsonContext f =
-    List.head f.contextStack
-
-
-
 -- Context
 
 
@@ -196,13 +145,7 @@ type StringState
     = NoString
     | FirstChar
     | InString
-    | JsonString JsonStringState
-
-
-type JsonStringState
-    = JSNoString
-    | JSFirstChar
-    | JSInString
+    | JsonString Json.Formater
 
 
 
@@ -235,49 +178,35 @@ closeContext t c ( formater, writer ) =
     )
 
 
-openJsonContext : ComplexType -> Char -> ( Formater, Writer msg ) -> ( Formater, Writer msg )
-openJsonContext t c ( formater, writer ) =
-    ( { formater | jsonFormater = formater.jsonFormater |> pushJsonContext t }
-    , writer
-        |> Writer.appendToBuffer c
-        >> Writer.flushBufferAsText
-        >> Writer.flushCurrentLine
-        >> Writer.indent
-    )
-
-
-closeJsonContext : ComplexType -> Char -> ( Formater, Writer msg ) -> ( Formater, Writer msg )
-closeJsonContext t c ( formater, writer ) =
-    ( { formater | jsonFormater = formater.jsonFormater |> popJsonContext }
-    , writer
-        |> Writer.flushBufferAsText
-        >> Writer.flushCurrentLine
-        >> Writer.writeText (String.fromChar c)
-        >> Writer.unindent
-    )
-
-
 parseChar : Char -> ( Formater, Writer msg ) -> ( Formater, Writer msg )
 parseChar c ( formater, writer ) =
     case ( formater.stringState, c ) of
-        ( stringState, '\\' ) ->
-            case stringState of
-                JsonString _ ->
-                    ( { formater
-                        | jsonFormater =
-                            formater.jsonFormater
-                                |> setJFEscapeNext (not formater.escapeNext)
-                      }
-                    , writer
-                    )
-
-                _ ->
+        ( JsonString jsonFormater, '\\' ) ->
+            if formater.escapeNext then
+                let
+                    ( newJsonFormater, newWriter ) =
+                        Json.parseChar '\\' ( jsonFormater, writer )
+                in
                     ( { formater
                         | escapeNext = not formater.escapeNext
+                        , stringState = JsonString newJsonFormater
                       }
-                    , writer
-                        |> Writer.appendToBuffer '\\'
+                    , newWriter
                     )
+            else
+                ( { formater
+                    | escapeNext = not formater.escapeNext
+                  }
+                , writer
+                )
+
+        ( _, '\\' ) ->
+            ( { formater
+                | escapeNext = not formater.escapeNext
+              }
+            , writer
+                |> Writer.appendToBuffer '\\'
+            )
 
         ( NoString, '{' ) ->
             ( formater, writer ) |> openContext Record '{'
@@ -349,19 +278,21 @@ parseChar c ( formater, writer ) =
         ( FirstChar, c ) ->
             if List.member c [ '{', '[' ] then
                 {- Enter JSON -}
-                ( { formater
-                    | stringState = JsonString JSNoString
-                    , escapeNext = False
-                  }
-                , writer
-                    |> Writer.appendToBuffer '`'
-                    >> Writer.flushBufferAsText
-                    >> Writer.flushCurrentLine
-                    >> Writer.appendToBuffer c
-                    >> Writer.flushBufferAsText
-                    >> Writer.flushCurrentLine
-                    >> Writer.indent
-                )
+                let
+                    ( jsonFormater, newWriter ) =
+                        Json.parseChar c
+                            ( Json.init Json.defaultOptions
+                            , writer
+                                |> Writer.appendToBuffer '`'
+                                >> Writer.flushBufferAsText
+                            )
+                in
+                    ( { formater
+                        | stringState = JsonString jsonFormater
+                        , escapeNext = False
+                      }
+                    , newWriter
+                    )
             else
                 ( { formater
                     | stringState = InString
@@ -385,136 +316,43 @@ parseChar c ( formater, writer ) =
                     >> Writer.flushBufferAsColoredText formater.options.stringColor
                 )
 
-        ( JsonString JSNoString, '{' ) ->
-            ( formater, writer ) |> openJsonContext Record '{'
-
-        ( JsonString JSNoString, '}' ) ->
-            ( formater, writer ) |> closeJsonContext Record '}'
-
-        ( JsonString JSNoString, '[' ) ->
-            ( formater, writer ) |> openJsonContext List '['
-
-        ( JsonString JSNoString, ']' ) ->
-            ( formater, writer ) |> closeJsonContext List ']'
-
-        ( JsonString JSNoString, ',' ) ->
-            ( { formater
-                | jsonFormater =
-                    formater.jsonFormater
-                        |> setJFEscapeNext False
-              }
-            , writer
-                |> Writer.appendToBuffer ','
-                >> Writer.flushBufferAsText
-                >> Writer.flushCurrentLine
-                >> Writer.flushCurrentLine
-            )
-
-        ( JsonString JSNoString, '"' ) ->
-            if formater.jsonFormater.escapeNext then
-                ( { formater
-                    | jsonFormater =
-                        formater.jsonFormater
-                            |> setJFEscapeNext False
-                    , stringState = JsonString JSFirstChar
-                  }
-                , writer
-                    |> Writer.flushBufferAsText
-                )
-            else
-                {- Escape JSON -}
-                ( { formater
-                    | jsonFormater =
-                        formater.jsonFormater
-                            |> setJFEscapeNext False
-                    , stringState = NoString
-                  }
-                , writer
-                    |> Writer.appendToBuffer '`'
-                    >> Writer.flushBufferAsText
-                    >> Writer.flushCurrentLine
-                )
-
-        ( JsonString JSFirstChar, '"' ) ->
-            ( { formater
-                | jsonFormater =
-                    formater.jsonFormater
-                        |> setJFEscapeNext False
-                , stringState = JsonString JSNoString
-              }
-            , writer
-                |> Writer.appendToBuffer '"'
-                |> Writer.appendToBuffer '"'
-                |> Writer.flushBufferAsColoredText formater.jsonFormater.options.stringColor
-            )
-
-        ( JsonString JSFirstChar, c ) ->
-            if formater.jsonFormater.escapeNext then
-                ( { formater
-                    | jsonFormater =
-                        formater.jsonFormater
-                            |> setJFEscapeNext False
-                    , stringState = JsonString JSInString
-                  }
-                , writer
-                    |> Writer.appendToBuffer '"'
-                    |> Writer.appendToBuffer '\\'
-                    |> Writer.appendToBuffer c
-                )
-            else
-                ( { formater
-                    | jsonFormater =
-                        formater.jsonFormater
-                            |> setJFEscapeNext False
-                    , stringState = JsonString JSInString
-                  }
-                , writer
-                    |> Writer.appendToBuffer '"'
-                    |> Writer.appendToBuffer c
-                )
-
-        ( JsonString JSInString, '"' ) ->
+        ( JsonString jsonFormater, '"' ) ->
             if formater.escapeNext then
-                ( { formater
-                    | jsonFormater =
-                        formater.jsonFormater
-                            |> setJFEscapeNext False
-                  }
-                , writer
-                    |> Writer.appendToBuffer '\\'
-                    |> Writer.appendToBuffer '"'
-                )
+                let
+                    ( newJsonFormater, newWriter ) =
+                        Json.parseChar c ( jsonFormater, writer )
+                in
+                    ( { formater
+                        | escapeNext = False
+                        , stringState = JsonString newJsonFormater
+                      }
+                    , newWriter
+                    )
             else
-                ( { formater
-                    | jsonFormater =
-                        formater.jsonFormater
-                            |> setJFEscapeNext False
-                    , stringState = JsonString JSNoString
-                  }
-                , writer
-                    |> Writer.appendToBuffer '"'
-                    |> Writer.flushBufferAsColoredText formater.jsonFormater.options.stringColor
-                )
+                let
+                    ( newJsonFormater, newWriter ) =
+                        Json.parseEOF ( jsonFormater, writer )
+                in
+                    ( { formater
+                        | escapeNext = False
+                        , stringState = NoString
+                      }
+                    , newWriter
+                        |> Writer.appendToBuffer '`'
+                        >> Writer.flushBufferAsText
+                        >> Writer.flushCurrentLine
+                    )
 
-        ( JsonString _, c ) ->
-            if formater.jsonFormater.escapeNext then
+        ( JsonString jsonFormater, c ) ->
+            let
+                ( newJsonFormater, newWriter ) =
+                    Json.parseChar c ( jsonFormater, writer )
+            in
                 ( { formater
-                    | jsonFormater =
-                        formater.jsonFormater
-                            |> setJFEscapeNext False
+                    | escapeNext = False
+                    , stringState = JsonString newJsonFormater
                   }
-                , writer
-                    |> Writer.appendToBuffer '\\'
-                    |> Writer.appendToBuffer c
-                )
-            else
-                ( { formater
-                    | jsonFormater =
-                        formater.jsonFormater
-                            |> setJFEscapeNext False
-                  }
-                , writer
-                    |> Writer.appendToBuffer c
+                , newWriter
                 )
 
         ( _, c ) ->
