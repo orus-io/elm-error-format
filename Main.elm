@@ -2,6 +2,7 @@ module Main exposing (..)
 
 import Html exposing (Html, Attribute, div, text, span)
 import Html.Attributes exposing (style)
+import Writer exposing (Writer)
 
 
 -- MAIN
@@ -76,133 +77,10 @@ view model =
 
 formatErrString : String -> Html msg
 formatErrString error =
-    String.foldl parseChar ( newFormater formaterDefaultOptions, newWriter ) error
+    String.foldl parseChar ( newFormater formaterDefaultOptions, Writer.init ) error
         |> parseEOF
         |> Tuple.second
-        |> render
-
-
-
--- Writer
-
-
-type alias Writer msg =
-    { buffer : Buffer
-    , ignoreNextSpace : Bool
-    , currentLine : List (Html msg)
-    , indent : Int
-    , output : List (Html msg)
-    }
-
-
-newWriter : Writer msg
-newWriter =
-    { buffer = emptyBuffer
-    , ignoreNextSpace = False
-    , currentLine = []
-    , indent = 0
-    , output = []
-    }
-
-
-popBuffer : Writer msg -> ( String, Writer msg )
-popBuffer w =
-    ( w.buffer |> bufferAsString
-    , { w | buffer = emptyBuffer }
-    )
-
-
-appendToBuffer : Char -> Writer msg -> Writer msg
-appendToBuffer c w =
-    case ( w.ignoreNextSpace, c ) of
-        ( True, ' ' ) ->
-            w
-
-        ( _, _ ) ->
-            { w
-                | buffer = bufferAppend c w.buffer
-                , ignoreNextSpace = False
-            }
-
-
-appendSingleSpace : Writer msg -> Writer msg
-appendSingleSpace w =
-    { w
-        | ignoreNextSpace = True
-        , buffer =
-            w.buffer
-                |> bufferRStrip ' '
-                |> bufferAppend ' '
-    }
-
-
-writeText : String -> Writer msg -> Writer msg
-writeText s w =
-    { w
-        | currentLine = List.append w.currentLine [ text s ]
-    }
-
-
-writeColoredText : String -> String -> Writer msg -> Writer msg
-writeColoredText color s w =
-    { w
-        | currentLine =
-            List.append
-                w.currentLine
-                [ span [ style [ ( "color", color ) ] ] [ text s ] ]
-    }
-
-
-flushBufferAsText : Writer msg -> Writer msg
-flushBufferAsText w =
-    let
-        ( s, newW ) =
-            popBuffer w
-    in
-        newW |> writeText s
-
-
-flushBufferAsColoredText : String -> Writer msg -> Writer msg
-flushBufferAsColoredText color w =
-    let
-        ( s, newW ) =
-            popBuffer w
-    in
-        newW |> writeColoredText color s
-
-
-indent : Writer msg -> Writer msg
-indent w =
-    { w
-        | indent = w.indent + 1
-    }
-
-
-unindent : Writer msg -> Writer msg
-unindent w =
-    { w
-        | indent = w.indent - 1
-    }
-
-
-padding : Int -> Attribute msg
-padding indent =
-    style [ ( "padding-left", ((toString (indent * 2)) ++ "rem") ) ]
-
-
-flushCurrentLine : Writer msg -> Writer msg
-flushCurrentLine w =
-    { w
-        | output =
-            List.append w.output
-                [ div [ padding w.indent ] w.currentLine ]
-        , currentLine = []
-    }
-
-
-render : Writer msg -> Html msg
-render w =
-    div [] w.output
+        |> Writer.render
 
 
 
@@ -305,42 +183,6 @@ currentJsonContext f =
 
 
 
--- Buffer
-
-
-type alias Buffer =
-    List Char
-
-
-emptyBuffer : Buffer
-emptyBuffer =
-    []
-
-
-bufferAppend : Char -> Buffer -> Buffer
-bufferAppend c b =
-    c :: b
-
-
-bufferRStrip : Char -> Buffer -> Buffer
-bufferRStrip c b =
-    case b of
-        h :: t ->
-            if h == c then
-                bufferRStrip c t
-            else
-                b
-
-        b ->
-            b
-
-
-bufferAsString : Buffer -> String
-bufferAsString =
-    List.reverse >> String.fromList
-
-
-
 -- Context
 
 
@@ -372,11 +214,11 @@ openContext t c ( formater, writer ) =
     ( formater
         |> pushContext t
     , writer
-        |> flushBufferAsText
-        >> flushCurrentLine
-        >> indent
-        >> appendToBuffer c
-        >> appendSingleSpace
+        |> Writer.flushBufferAsText
+        >> Writer.flushCurrentLine
+        >> Writer.indent
+        >> Writer.appendToBuffer c
+        >> Writer.appendSingleSpace
     )
 
 
@@ -385,11 +227,11 @@ closeContext t c ( formater, writer ) =
     ( formater
         |> popContext
     , writer
-        |> flushBufferAsText
-        >> flushCurrentLine
-        >> writeText (String.fromChar c)
-        >> flushCurrentLine
-        >> unindent
+        |> Writer.flushBufferAsText
+        >> Writer.flushCurrentLine
+        >> Writer.writeText (String.fromChar c)
+        >> Writer.flushCurrentLine
+        >> Writer.unindent
     )
 
 
@@ -397,10 +239,10 @@ openJsonContext : ComplexType -> Char -> ( Formater, Writer msg ) -> ( Formater,
 openJsonContext t c ( formater, writer ) =
     ( { formater | jsonFormater = formater.jsonFormater |> pushJsonContext t }
     , writer
-        |> appendToBuffer c
-        >> flushBufferAsText
-        >> flushCurrentLine
-        >> indent
+        |> Writer.appendToBuffer c
+        >> Writer.flushBufferAsText
+        >> Writer.flushCurrentLine
+        >> Writer.indent
     )
 
 
@@ -408,10 +250,10 @@ closeJsonContext : ComplexType -> Char -> ( Formater, Writer msg ) -> ( Formater
 closeJsonContext t c ( formater, writer ) =
     ( { formater | jsonFormater = formater.jsonFormater |> popJsonContext }
     , writer
-        |> flushBufferAsText
-        >> flushCurrentLine
-        >> writeText (String.fromChar c)
-        >> unindent
+        |> Writer.flushBufferAsText
+        >> Writer.flushCurrentLine
+        >> Writer.writeText (String.fromChar c)
+        >> Writer.unindent
     )
 
 
@@ -434,7 +276,7 @@ parseChar c ( formater, writer ) =
                         | escapeNext = not formater.escapeNext
                       }
                     , writer
-                        |> appendToBuffer '\\'
+                        |> Writer.appendToBuffer '\\'
                     )
 
         ( NoString, '{' ) ->
@@ -453,16 +295,16 @@ parseChar c ( formater, writer ) =
             ( formater
                 |> pushContext Tuple
             , writer
-                |> appendToBuffer '('
-                >> appendSingleSpace
+                |> Writer.appendToBuffer '('
+                >> Writer.appendSingleSpace
             )
 
         ( NoString, ')' ) ->
             ( formater
                 |> popContext
             , writer
-                |> appendSingleSpace
-                >> appendToBuffer ')'
+                |> Writer.appendSingleSpace
+                >> Writer.appendToBuffer ')'
             )
 
         ( NoString, ',' ) ->
@@ -470,37 +312,37 @@ parseChar c ( formater, writer ) =
                 Just Tuple ->
                     ( formater
                     , writer
-                        |> appendToBuffer ','
-                        >> appendSingleSpace
+                        |> Writer.appendToBuffer ','
+                        >> Writer.appendSingleSpace
                     )
 
                 _ ->
                     ( formater
                     , writer
-                        |> flushBufferAsText
-                        >> flushCurrentLine
-                        >> appendToBuffer ','
-                        >> appendSingleSpace
+                        |> Writer.flushBufferAsText
+                        >> Writer.flushCurrentLine
+                        >> Writer.appendToBuffer ','
+                        >> Writer.appendSingleSpace
                     )
 
         ( NoString, '"' ) ->
             ( { formater | stringState = FirstChar }
             , writer
-                |> flushBufferAsText
+                |> Writer.flushBufferAsText
             )
 
         ( FirstChar, '"' ) ->
             (if formater.escapeNext then
                 ( { formater | escapeNext = False }
                 , writer
-                    |> appendToBuffer '"'
+                    |> Writer.appendToBuffer '"'
                 )
              else
                 ( { formater | stringState = NoString }
                 , writer
-                    |> appendToBuffer '"'
-                    >> appendToBuffer '"'
-                    >> flushBufferAsColoredText formater.options.stringColor
+                    |> Writer.appendToBuffer '"'
+                    >> Writer.appendToBuffer '"'
+                    >> Writer.flushBufferAsColoredText formater.options.stringColor
                 )
             )
 
@@ -512,13 +354,13 @@ parseChar c ( formater, writer ) =
                     , escapeNext = False
                   }
                 , writer
-                    |> appendToBuffer '`'
-                    >> flushBufferAsText
-                    >> flushCurrentLine
-                    >> appendToBuffer c
-                    >> flushBufferAsText
-                    >> flushCurrentLine
-                    >> indent
+                    |> Writer.appendToBuffer '`'
+                    >> Writer.flushBufferAsText
+                    >> Writer.flushCurrentLine
+                    >> Writer.appendToBuffer c
+                    >> Writer.flushBufferAsText
+                    >> Writer.flushCurrentLine
+                    >> Writer.indent
                 )
             else
                 ( { formater
@@ -526,21 +368,21 @@ parseChar c ( formater, writer ) =
                     , escapeNext = False
                   }
                 , writer
-                    |> appendToBuffer '"'
-                    >> appendToBuffer c
+                    |> Writer.appendToBuffer '"'
+                    >> Writer.appendToBuffer c
                 )
 
         ( InString, '"' ) ->
             if formater.escapeNext then
                 ( { formater | escapeNext = False }
                 , writer
-                    |> appendToBuffer '"'
+                    |> Writer.appendToBuffer '"'
                 )
             else
                 ( { formater | stringState = NoString }
                 , writer
-                    |> appendToBuffer '"'
-                    >> flushBufferAsColoredText formater.options.stringColor
+                    |> Writer.appendToBuffer '"'
+                    >> Writer.flushBufferAsColoredText formater.options.stringColor
                 )
 
         ( JsonString JSNoString, '{' ) ->
@@ -562,10 +404,10 @@ parseChar c ( formater, writer ) =
                         |> setJFEscapeNext False
               }
             , writer
-                |> appendToBuffer ','
-                >> flushBufferAsText
-                >> flushCurrentLine
-                >> flushCurrentLine
+                |> Writer.appendToBuffer ','
+                >> Writer.flushBufferAsText
+                >> Writer.flushCurrentLine
+                >> Writer.flushCurrentLine
             )
 
         ( JsonString JSNoString, '"' ) ->
@@ -577,7 +419,7 @@ parseChar c ( formater, writer ) =
                     , stringState = JsonString JSFirstChar
                   }
                 , writer
-                    |> flushBufferAsText
+                    |> Writer.flushBufferAsText
                 )
             else
                 {- Escape JSON -}
@@ -588,9 +430,9 @@ parseChar c ( formater, writer ) =
                     , stringState = NoString
                   }
                 , writer
-                    |> appendToBuffer '`'
-                    >> flushBufferAsText
-                    >> flushCurrentLine
+                    |> Writer.appendToBuffer '`'
+                    >> Writer.flushBufferAsText
+                    >> Writer.flushCurrentLine
                 )
 
         ( JsonString JSFirstChar, '"' ) ->
@@ -601,9 +443,9 @@ parseChar c ( formater, writer ) =
                 , stringState = JsonString JSNoString
               }
             , writer
-                |> appendToBuffer '"'
-                |> appendToBuffer '"'
-                |> flushBufferAsColoredText formater.jsonFormater.options.stringColor
+                |> Writer.appendToBuffer '"'
+                |> Writer.appendToBuffer '"'
+                |> Writer.flushBufferAsColoredText formater.jsonFormater.options.stringColor
             )
 
         ( JsonString JSFirstChar, c ) ->
@@ -615,9 +457,9 @@ parseChar c ( formater, writer ) =
                     , stringState = JsonString JSInString
                   }
                 , writer
-                    |> appendToBuffer '"'
-                    |> appendToBuffer '\\'
-                    |> appendToBuffer c
+                    |> Writer.appendToBuffer '"'
+                    |> Writer.appendToBuffer '\\'
+                    |> Writer.appendToBuffer c
                 )
             else
                 ( { formater
@@ -627,8 +469,8 @@ parseChar c ( formater, writer ) =
                     , stringState = JsonString JSInString
                   }
                 , writer
-                    |> appendToBuffer '"'
-                    |> appendToBuffer c
+                    |> Writer.appendToBuffer '"'
+                    |> Writer.appendToBuffer c
                 )
 
         ( JsonString JSInString, '"' ) ->
@@ -639,8 +481,8 @@ parseChar c ( formater, writer ) =
                             |> setJFEscapeNext False
                   }
                 , writer
-                    |> appendToBuffer '\\'
-                    |> appendToBuffer '"'
+                    |> Writer.appendToBuffer '\\'
+                    |> Writer.appendToBuffer '"'
                 )
             else
                 ( { formater
@@ -650,8 +492,8 @@ parseChar c ( formater, writer ) =
                     , stringState = JsonString JSNoString
                   }
                 , writer
-                    |> appendToBuffer '"'
-                    |> flushBufferAsColoredText formater.jsonFormater.options.stringColor
+                    |> Writer.appendToBuffer '"'
+                    |> Writer.flushBufferAsColoredText formater.jsonFormater.options.stringColor
                 )
 
         ( JsonString _, c ) ->
@@ -662,8 +504,8 @@ parseChar c ( formater, writer ) =
                             |> setJFEscapeNext False
                   }
                 , writer
-                    |> appendToBuffer '\\'
-                    |> appendToBuffer c
+                    |> Writer.appendToBuffer '\\'
+                    |> Writer.appendToBuffer c
                 )
             else
                 ( { formater
@@ -672,13 +514,13 @@ parseChar c ( formater, writer ) =
                             |> setJFEscapeNext False
                   }
                 , writer
-                    |> appendToBuffer c
+                    |> Writer.appendToBuffer c
                 )
 
         ( _, c ) ->
             ( { formater | escapeNext = False }
             , writer
-                |> appendToBuffer c
+                |> Writer.appendToBuffer c
             )
 
 
@@ -686,6 +528,6 @@ parseEOF : ( Formater, Writer msg ) -> ( Formater, Writer msg )
 parseEOF ( formater, writer ) =
     ( formater
     , writer
-        |> flushBufferAsText
-        >> flushCurrentLine
+        |> Writer.flushBufferAsText
+        >> Writer.flushCurrentLine
     )
