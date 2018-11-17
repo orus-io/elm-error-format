@@ -112,7 +112,8 @@ parseChar c ( formater, writer ) =
                   }
                 , writer
                     |> Writer.appendToBuffer '"'
-                    |> Writer.flushBufferAsColoredText formater.options.stringColor
+                    |> Writer.flushBufferAsColoredText
+                        formater.options.stringColor
                 )
 
         ( _, c ) ->
