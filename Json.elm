@@ -40,24 +40,24 @@ init options =
 -- Parse
 
 
-openContext : Char -> ( Formater, Writer msg ) -> ( Formater, Writer msg )
-openContext c ( formater, writer ) =
+openContext : InputChar -> ( Formater, Writer msg ) -> ( Formater, Writer msg )
+openContext v ( formater, writer ) =
     ( formater
     , writer
-        |> Writer.appendToBuffer c
+        |> Writer.appendToBuffer (toChar v)
         >> Writer.flushBufferAsText
         >> Writer.flushCurrentLine
         >> Writer.indent
     )
 
 
-closeContext : Char -> ( Formater, Writer msg ) -> ( Formater, Writer msg )
-closeContext c ( formater, writer ) =
+closeContext : InputChar -> ( Formater, Writer msg ) -> ( Formater, Writer msg )
+closeContext v ( formater, writer ) =
     ( formater
     , writer
         |> Writer.flushBufferAsText
         >> Writer.flushCurrentLine
-        >> Writer.writeText (String.fromChar c)
+        >> Writer.writeText (String.fromChar <| toChar v)
         >> Writer.unindent
     )
 
@@ -66,16 +66,16 @@ parseChar : InputChar -> ( Formater, Writer msg ) -> ( Formater, Writer msg )
 parseChar c ( formater, writer ) =
     case ( formater.inString, c ) of
         ( False, Reader.LBrace ) ->
-            ( formater, writer ) |> openContext '{'
+            ( formater, writer ) |> openContext Reader.LBrace
 
         ( False, Reader.RBrace ) ->
-            ( formater, writer ) |> closeContext '}'
+            ( formater, writer ) |> closeContext Reader.RBrace
 
         ( False, Reader.LBracket ) ->
-            ( formater, writer ) |> openContext '['
+            ( formater, writer ) |> openContext Reader.LBracket
 
         ( False, Reader.RBracket ) ->
-            ( formater, writer ) |> closeContext ']'
+            ( formater, writer ) |> closeContext Reader.RBracket
 
         ( False, Reader.Comma ) ->
             ( formater
@@ -101,18 +101,14 @@ parseChar c ( formater, writer ) =
             )
 
         ( True, Reader.Escaped '"' ) ->
-            let
-                _ =
-                    Debug.log "!!!" Reader.DoubleQuote
-            in
-                ( { formater
-                    | inString = False
-                  }
-                , writer
-                    |> Writer.appendToBuffer '"'
-                    |> Writer.flushBufferAsColoredText
-                        formater.options.stringColor
-                )
+            ( { formater
+                | inString = False
+              }
+            , writer
+                |> Writer.appendToBuffer '"'
+                |> Writer.flushBufferAsColoredText
+                    formater.options.stringColor
+            )
 
         ( _, c ) ->
             ( { formater

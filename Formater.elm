@@ -103,33 +103,33 @@ currentContext f =
 
 openContext :
     ComplexType
-    -> Char
+    -> InputChar
     -> ( Formater, Writer msg )
     -> ( Formater, Writer msg )
-openContext t c ( formater, writer ) =
+openContext t v ( formater, writer ) =
     ( formater
         |> pushContext t
     , writer
         |> Writer.flushBufferAsText
         >> Writer.flushCurrentLine
         >> Writer.indent
-        >> Writer.appendToBuffer c
+        >> Writer.appendToBuffer (toChar v)
         >> Writer.appendSingleSpace
     )
 
 
 closeContext :
     ComplexType
-    -> Char
+    -> InputChar
     -> ( Formater, Writer msg )
     -> ( Formater, Writer msg )
-closeContext t c ( formater, writer ) =
+closeContext t v ( formater, writer ) =
     ( formater
         |> popContext
     , writer
         |> Writer.flushBufferAsText
         >> Writer.flushCurrentLine
-        >> Writer.writeText (String.fromChar c)
+        >> Writer.writeText (String.fromChar <| toChar v)
         >> Writer.flushCurrentLine
         >> Writer.unindent
     )
@@ -150,16 +150,16 @@ parseInputChar c ( formater, writer ) =
                 )
 
         ( NoString, Reader.LBrace ) ->
-            ( formater, writer ) |> openContext Record '{'
+            ( formater, writer ) |> openContext Record Reader.LBrace
 
         ( NoString, Reader.RBrace ) ->
-            ( formater, writer ) |> closeContext Record '}'
+            ( formater, writer ) |> closeContext Record Reader.RBrace
 
         ( NoString, Reader.LBracket ) ->
-            ( formater, writer ) |> openContext List '['
+            ( formater, writer ) |> openContext List Reader.LBracket
 
         ( NoString, Reader.RBracket ) ->
-            ( formater, writer ) |> closeContext List ']'
+            ( formater, writer ) |> closeContext List Reader.RBracket
 
         ( NoString, Reader.LParenthesis ) ->
             ( formater
