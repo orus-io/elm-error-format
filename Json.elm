@@ -1,6 +1,12 @@
 module Json exposing (..)
 
 import Writer exposing (Writer)
+import Reader
+    exposing
+        ( Reader
+        , InputChar
+        , toChar
+        )
 
 
 -- Json Formater
@@ -56,33 +62,23 @@ closeContext c ( formater, writer ) =
     )
 
 
-parseChar : Char -> ( Formater, Writer msg ) -> ( Formater, Writer msg )
+parseChar : InputChar -> ( Formater, Writer msg ) -> ( Formater, Writer msg )
 parseChar c ( formater, writer ) =
     case ( formater.inString, c ) of
-        ( _, '\\' ) ->
-            ( { formater
-                | escapeNext = not formater.escapeNext
-              }
-            , writer
-                |> Writer.appendToBuffer '\\'
-            )
-
-        ( False, '{' ) ->
+        ( False, Reader.LBrace ) ->
             ( formater, writer ) |> openContext '{'
 
-        ( False, '}' ) ->
+        ( False, Reader.RBrace ) ->
             ( formater, writer ) |> closeContext '}'
 
-        ( False, '[' ) ->
+        ( False, Reader.LBracket ) ->
             ( formater, writer ) |> openContext '['
 
-        ( False, ']' ) ->
+        ( False, Reader.RBracket ) ->
             ( formater, writer ) |> closeContext ']'
 
-        ( False, ',' ) ->
-            ( { formater
-                | escapeNext = False
-              }
+        ( False, Reader.Comma ) ->
+            ( formater
             , writer
                 |> Writer.appendToBuffer ','
                 >> Writer.flushBufferAsText
@@ -90,7 +86,7 @@ parseChar c ( formater, writer ) =
                 >> Writer.flushCurrentLine
             )
 
-        ( False, '"' ) ->
+        ( False, Reader.Escaped '"' ) ->
             ( { formater
                 | inString = True
               }
@@ -98,15 +94,17 @@ parseChar c ( formater, writer ) =
                 |> Writer.appendToBuffer '"'
             )
 
-        ( True, '"' ) ->
-            if formater.escapeNext then
-                ( { formater
-                    | escapeNext = False
-                  }
-                , writer
-                    |> Writer.appendToBuffer '"'
-                )
-            else
+        ( True, Reader.DoubleQuote ) ->
+            ( formater
+            , writer
+                |> Writer.appendToBuffer '"'
+            )
+
+        ( True, Reader.Escaped '"' ) ->
+            let
+                _ =
+                    Debug.log "!!!" Reader.DoubleQuote
+            in
                 ( { formater
                     | inString = False
                   }
@@ -121,7 +119,7 @@ parseChar c ( formater, writer ) =
                 | escapeNext = False
               }
             , writer
-                |> Writer.appendToBuffer c
+                |> Writer.appendToBuffer (Reader.toChar c)
             )
 
 

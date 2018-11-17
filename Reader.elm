@@ -43,7 +43,9 @@ parseChar : Char -> Reader -> Reader
 parseChar c reader =
     case c of
         '\\' ->
-            new
+            reader
+                |> setNextIsEscape True
+                |> setCurrent Nothing
 
         c ->
             reader

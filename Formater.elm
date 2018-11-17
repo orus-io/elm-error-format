@@ -30,7 +30,10 @@ type StringState
 -- Main
 
 
-read : Char -> ( Reader, ( Formater, Writer msg ) ) -> ( Reader, ( Formater, Writer msg ) )
+read :
+    Char
+    -> ( Reader, ( Formater, Writer msg ) )
+    -> ( Reader, ( Formater, Writer msg ) )
 read c ( reader, ( formater, writer ) ) =
     let
         newReader =
@@ -135,24 +138,17 @@ closeContext t c ( formater, writer ) =
 parseInputChar : InputChar -> ( Formater, Writer msg ) -> ( Formater, Writer msg )
 parseInputChar c ( formater, writer ) =
     case ( formater.stringState, c ) of
-        -- ( JsonString jsonFormater, '\\' ) ->
-        --     if formater.escapeNext then
-        --         let
-        --             ( newJsonFormater, newWriter ) =
-        --                 Json.parseChar '\\' ( jsonFormater, writer )
-        --         in
-        --             ( { formater
-        --                 | escapeNext = not formater.escapeNext
-        --                 , stringState = JsonString newJsonFormater
-        --               }
-        --             , newWriter
-        --             )
-        --     else
-        --         ( { formater
-        --             | escapeNext = not formater.escapeNext
-        --           }
-        --         , writer
-        --         )
+        ( JsonString jsonFormater, Reader.Escaped '\\' ) ->
+            let
+                ( newJsonFormater, newWriter ) =
+                    Json.parseChar (Reader.Escaped '\\') ( jsonFormater, writer )
+            in
+                ( { formater
+                    | stringState = JsonString newJsonFormater
+                  }
+                , newWriter
+                )
+
         ( NoString, Reader.LBrace ) ->
             ( formater, writer ) |> openContext Record '{'
 
@@ -225,19 +221,14 @@ parseInputChar c ( formater, writer ) =
             {- Enter JSON -}
             let
                 ( jsonFormater, newWriter ) =
-                    ( formater, writer )
-
-                -- TODO
-                -- Json.parseChar c
-                --     ( Json.init Json.defaultOptions
-                --     , writer
-                --         |> Writer.appendToBuffer '`'
-                --         >> Writer.flushBufferAsText
-                --     )
+                    Json.parseChar c
+                        ( Json.init Json.defaultOptions
+                        , writer
+                            |> Writer.appendToBuffer '`'
+                            >> Writer.flushBufferAsText
+                        )
             in
-                ( formater
-                  -- TODO
-                  -- { formater | stringState = JsonString jsonFormater }
+                ( { formater | stringState = JsonString jsonFormater }
                 , newWriter
                 )
 
@@ -245,19 +236,15 @@ parseInputChar c ( formater, writer ) =
             {- Enter JSON -}
             let
                 ( jsonFormater, newWriter ) =
-                    ( formater, writer )
-
-                -- TODO
-                -- Json.parseChar c
-                --     ( Json.init Json.defaultOptions
-                --     , writer
-                --         |> Writer.appendToBuffer '`'
-                --         >> Writer.flushBufferAsText
-                --     )
+                    Json.parseChar
+                        c
+                        ( Json.init Json.defaultOptions
+                        , writer
+                            |> Writer.appendToBuffer '`'
+                            >> Writer.flushBufferAsText
+                        )
             in
-                ( formater
-                  -- TODO
-                  -- { formater | stringState = JsonString jsonFormater }
+                ( { formater | stringState = JsonString jsonFormater }
                 , newWriter
                 )
 
@@ -283,46 +270,43 @@ parseInputChar c ( formater, writer ) =
                     formater.options.stringColor
             )
 
-        -- ( JsonString jsonFormater, '"' ) ->
-        --     if formater.escapeNext then
-        --         let
-        --             ( newJsonFormater, newWriter ) =
-        --                 Json.parseChar c ( jsonFormater, writer )
-        --         in
-        --             ( { formater
-        --                 | escapeNext = False
-        --                 , stringState = JsonString newJsonFormater
-        --               }
-        --             , newWriter
-        --             )
-        --     else
-        --         let
-        --             ( newJsonFormater, newWriter ) =
-        --                 Json.parseEOF ( jsonFormater, writer )
-        --         in
-        --             ( { formater
-        --                 | escapeNext = False
-        --                 , stringState = NoString
-        --               }
-        --             , newWriter
-        --                 |> Writer.appendToBuffer '`'
-        --                 >> Writer.flushBufferAsText
-        --                 >> Writer.flushCurrentLine
-        --             )
-        -- ( JsonString jsonFormater, c ) ->
-        --     let
-        --         ( newJsonFormater, newWriter ) =
-        --             Json.parseChar c ( jsonFormater, writer )
-        --     in
-        --         ( { formater
-        --             | escapeNext = False
-        --             , stringState = JsonString newJsonFormater
-        --           }
-        --         , newWriter
-        --         )
-        -- TODO: remove once JsonFormater refactored
-        ( JsonString _, _ ) ->
-            ( formater, writer )
+        ( JsonString jsonFormater, Reader.Escaped '"' ) ->
+            let
+                ( newJsonFormater, newWriter ) =
+                    Json.parseChar
+                        (Reader.Escaped '"')
+                        ( jsonFormater, writer )
+            in
+                ( { formater
+                    | stringState = JsonString newJsonFormater
+                  }
+                , newWriter
+                )
+
+        ( JsonString jsonFormater, Reader.DoubleQuote ) ->
+            let
+                ( newJsonFormater, newWriter ) =
+                    Json.parseEOF ( jsonFormater, writer )
+            in
+                ( { formater
+                    | stringState = NoString
+                  }
+                , newWriter
+                    |> Writer.appendToBuffer '`'
+                    >> Writer.flushBufferAsText
+                    >> Writer.flushCurrentLine
+                )
+
+        ( JsonString jsonFormater, char ) ->
+            let
+                ( newJsonFormater, newWriter ) =
+                    Json.parseChar char ( jsonFormater, writer )
+            in
+                ( { formater
+                    | stringState = JsonString newJsonFormater
+                  }
+                , newWriter
+                )
 
         ( _, Reader.Escaped c ) ->
             ( formater
