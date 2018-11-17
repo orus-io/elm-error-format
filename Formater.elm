@@ -2,52 +2,39 @@ module Formater exposing (..)
 
 import Writer exposing (Writer)
 import Json
+import Reader
+    exposing
+        ( Reader
+        , InputChar
+        , toChar
+        )
 
 
--- Reader
+-- Types
 
 
-type alias Reader =
-    { nextIsEscaped : Bool
-    , current : Maybe InputChar
-    }
+type ComplexType
+    = List
+    | Record
+    | Tuple
 
 
-newReader : Reader
-newReader =
-    { nextIsEscaped = False
-    , current = Nothing
-    }
+type StringState
+    = NoString
+    | FirstChar
+    | InString
+    | JsonString Json.Formater
 
 
-setCurrent : Maybe InputChar -> Reader -> Reader
-setCurrent v reader =
-    { reader | current = v }
 
-
-setNextIsEscape : Bool -> Reader -> Reader
-setNextIsEscape v reader =
-    { reader | nextIsEscaped = v }
-
-
-type InputChar
-    = LBrace
-    | RBrace
-    | LBracket
-    | RBracket
-    | LParenthesis
-    | RParenthesis
-    | DoubleQuote
-    | Comma
-    | Escaped Char
-    | Common Char
+-- Main
 
 
 read : Char -> ( Reader, ( Formater, Writer msg ) ) -> ( Reader, ( Formater, Writer msg ) )
 read c ( reader, ( formater, writer ) ) =
     let
         newReader =
-            parseChar c reader
+            Reader.parseChar c reader
 
         ( newFormater, newWriter ) =
             case newReader.current of
@@ -58,49 +45,6 @@ read c ( reader, ( formater, writer ) ) =
                     ( formater, writer )
     in
         ( newReader, ( newFormater, newWriter ) )
-
-
-parseChar : Char -> Reader -> Reader
-parseChar c reader =
-    case c of
-        '\\' ->
-            newReader
-
-        c ->
-            reader
-                |> setNextIsEscape False
-                |> setCurrent
-                    (if reader.nextIsEscaped then
-                        Just <| Escaped c
-                     else
-                        case c of
-                            '{' ->
-                                Just LBrace
-
-                            '}' ->
-                                Just RBrace
-
-                            '[' ->
-                                Just LBracket
-
-                            ']' ->
-                                Just RBracket
-
-                            '(' ->
-                                Just LParenthesis
-
-                            ')' ->
-                                Just RParenthesis
-
-                            '"' ->
-                                Just DoubleQuote
-
-                            ',' ->
-                                Just Comma
-
-                            c ->
-                                Just <| Common c
-                    )
 
 
 
@@ -151,23 +95,6 @@ currentContext f =
 
 
 
--- Context
-
-
-type ComplexType
-    = List
-    | Record
-    | Tuple
-
-
-type StringState
-    = NoString
-    | FirstChar
-    | InString
-    | JsonString Json.Formater
-
-
-
 -- Parser
 
 
@@ -207,176 +134,207 @@ closeContext t c ( formater, writer ) =
 
 parseInputChar : InputChar -> ( Formater, Writer msg ) -> ( Formater, Writer msg )
 parseInputChar c ( formater, writer ) =
-    ( formater, writer )
+    case ( formater.stringState, c ) of
+        -- ( JsonString jsonFormater, '\\' ) ->
+        --     if formater.escapeNext then
+        --         let
+        --             ( newJsonFormater, newWriter ) =
+        --                 Json.parseChar '\\' ( jsonFormater, writer )
+        --         in
+        --             ( { formater
+        --                 | escapeNext = not formater.escapeNext
+        --                 , stringState = JsonString newJsonFormater
+        --               }
+        --             , newWriter
+        --             )
+        --     else
+        --         ( { formater
+        --             | escapeNext = not formater.escapeNext
+        --           }
+        --         , writer
+        --         )
+        ( NoString, Reader.LBrace ) ->
+            ( formater, writer ) |> openContext Record '{'
 
+        ( NoString, Reader.RBrace ) ->
+            ( formater, writer ) |> closeContext Record '}'
 
+        ( NoString, Reader.LBracket ) ->
+            ( formater, writer ) |> openContext List '['
 
--- case ( formater.stringState, c ) of
---     ( JsonString jsonFormater, '\\' ) ->
---         if formater.escapeNext then
---             let
---                 ( newJsonFormater, newWriter ) =
---                     Json.parseChar '\\' ( jsonFormater, writer )
---             in
---                 ( { formater
---                     | escapeNext = not formater.escapeNext
---                     , stringState = JsonString newJsonFormater
---                   }
---                 , newWriter
---                 )
---         else
---             ( { formater
---                 | escapeNext = not formater.escapeNext
---               }
---             , writer
---             )
---     ( _, '\\' ) ->
---         ( { formater
---             | escapeNext = not formater.escapeNext
---           }
---         , writer
---             |> Writer.appendToBuffer '\\'
---         )
---     ( NoString, '{' ) ->
---         ( formater, writer ) |> openContext Record '{'
---     ( NoString, '}' ) ->
---         ( formater, writer ) |> closeContext Record '}'
---     ( NoString, '[' ) ->
---         ( formater, writer ) |> openContext List '['
---     ( NoString, ']' ) ->
---         ( formater, writer ) |> closeContext List ']'
---     ( NoString, '(' ) ->
---         ( formater
---             |> pushContext Tuple
---         , writer
---             |> Writer.appendToBuffer '('
---             >> Writer.appendSingleSpace
---         )
---     ( NoString, ')' ) ->
---         ( formater
---             |> popContext
---         , writer
---             |> Writer.appendSingleSpace
---             >> Writer.appendToBuffer ')'
---         )
---     ( NoString, ',' ) ->
---         case currentContext formater of
---             Just Tuple ->
---                 ( formater
---                 , writer
---                     |> Writer.appendToBuffer ','
---                     >> Writer.appendSingleSpace
---                 )
---             _ ->
---                 ( formater
---                 , writer
---                     |> Writer.flushBufferAsText
---                     >> Writer.flushCurrentLine
---                     >> Writer.appendToBuffer ','
---                     >> Writer.appendSingleSpace
---                 )
---     ( NoString, '"' ) ->
---         ( { formater | stringState = FirstChar }
---         , writer
---             |> Writer.flushBufferAsText
---         )
---     ( FirstChar, '"' ) ->
---         (if formater.escapeNext then
---             ( { formater | escapeNext = False }
---             , writer
---                 |> Writer.appendToBuffer '"'
---             )
---          else
---             ( { formater | stringState = NoString }
---             , writer
---                 |> Writer.appendToBuffer '"'
---                 >> Writer.appendToBuffer '"'
---                 >> Writer.flushBufferAsColoredText
---                     formater.options.stringColor
---             )
---         )
---     ( FirstChar, c ) ->
---         if List.member c [ '{', '[' ] then
---             {- Enter JSON -}
---             let
---                 ( jsonFormater, newWriter ) =
---                     Json.parseChar c
---                         ( Json.init Json.defaultOptions
---                         , writer
---                             |> Writer.appendToBuffer '`'
---                             >> Writer.flushBufferAsText
---                         )
---             in
---                 ( { formater
---                     | stringState = JsonString jsonFormater
---                     , escapeNext = False
---                   }
---                 , newWriter
---                 )
---         else
---             ( { formater
---                 | stringState = InString
---                 , escapeNext = False
---               }
---             , writer
---                 |> Writer.appendToBuffer '"'
---                 >> Writer.appendToBuffer c
---             )
---     ( InString, '"' ) ->
---         if formater.escapeNext then
---             ( { formater | escapeNext = False }
---             , writer
---                 |> Writer.appendToBuffer '"'
---             )
---         else
---             ( { formater | stringState = NoString }
---             , writer
---                 |> Writer.appendToBuffer '"'
---                 >> Writer.flushBufferAsColoredText
---                     formater.options.stringColor
---             )
---     ( JsonString jsonFormater, '"' ) ->
---         if formater.escapeNext then
---             let
---                 ( newJsonFormater, newWriter ) =
---                     Json.parseChar c ( jsonFormater, writer )
---             in
---                 ( { formater
---                     | escapeNext = False
---                     , stringState = JsonString newJsonFormater
---                   }
---                 , newWriter
---                 )
---         else
---             let
---                 ( newJsonFormater, newWriter ) =
---                     Json.parseEOF ( jsonFormater, writer )
---             in
---                 ( { formater
---                     | escapeNext = False
---                     , stringState = NoString
---                   }
---                 , newWriter
---                     |> Writer.appendToBuffer '`'
---                     >> Writer.flushBufferAsText
---                     >> Writer.flushCurrentLine
---                 )
---     ( JsonString jsonFormater, c ) ->
---         let
---             ( newJsonFormater, newWriter ) =
---                 Json.parseChar c ( jsonFormater, writer )
---         in
---             ( { formater
---                 | escapeNext = False
---                 , stringState = JsonString newJsonFormater
---               }
---             , newWriter
---             )
---     ( _, c ) ->
---         ( { formater | escapeNext = False }
---         , writer
---             |> Writer.appendToBuffer c
---         )
+        ( NoString, Reader.RBracket ) ->
+            ( formater, writer ) |> closeContext List ']'
+
+        ( NoString, Reader.LParenthesis ) ->
+            ( formater
+                |> pushContext Tuple
+            , writer
+                |> Writer.appendToBuffer '('
+                >> Writer.appendSingleSpace
+            )
+
+        ( NoString, Reader.RParenthesis ) ->
+            ( formater
+                |> popContext
+            , writer
+                |> Writer.appendSingleSpace
+                >> Writer.appendToBuffer ')'
+            )
+
+        ( NoString, Reader.Comma ) ->
+            case currentContext formater of
+                Just Tuple ->
+                    ( formater
+                    , writer
+                        |> Writer.appendToBuffer ','
+                        >> Writer.appendSingleSpace
+                    )
+
+                _ ->
+                    ( formater
+                    , writer
+                        |> Writer.flushBufferAsText
+                        >> Writer.flushCurrentLine
+                        >> Writer.appendToBuffer ','
+                        >> Writer.appendSingleSpace
+                    )
+
+        ( NoString, Reader.DoubleQuote ) ->
+            ( { formater | stringState = FirstChar }
+            , writer
+                |> Writer.flushBufferAsText
+            )
+
+        ( FirstChar, Reader.Escaped c ) ->
+            ( formater
+            , writer
+                |> Writer.appendToBuffer '\\'
+                |> Writer.appendToBuffer c
+            )
+
+        ( FirstChar, Reader.DoubleQuote ) ->
+            ( { formater | stringState = NoString }
+            , writer
+                |> Writer.appendToBuffer '"'
+                >> Writer.appendToBuffer '"'
+                >> Writer.flushBufferAsColoredText
+                    formater.options.stringColor
+            )
+
+        ( FirstChar, Reader.LBrace ) ->
+            {- Enter JSON -}
+            let
+                ( jsonFormater, newWriter ) =
+                    ( formater, writer )
+
+                -- TODO
+                -- Json.parseChar c
+                --     ( Json.init Json.defaultOptions
+                --     , writer
+                --         |> Writer.appendToBuffer '`'
+                --         >> Writer.flushBufferAsText
+                --     )
+            in
+                ( formater
+                  -- TODO
+                  -- { formater | stringState = JsonString jsonFormater }
+                , newWriter
+                )
+
+        ( FirstChar, Reader.LBracket ) ->
+            {- Enter JSON -}
+            let
+                ( jsonFormater, newWriter ) =
+                    ( formater, writer )
+
+                -- TODO
+                -- Json.parseChar c
+                --     ( Json.init Json.defaultOptions
+                --     , writer
+                --         |> Writer.appendToBuffer '`'
+                --         >> Writer.flushBufferAsText
+                --     )
+            in
+                ( formater
+                  -- TODO
+                  -- { formater | stringState = JsonString jsonFormater }
+                , newWriter
+                )
+
+        ( FirstChar, v ) ->
+            ( { formater | stringState = InString }
+            , writer
+                |> Writer.appendToBuffer '"'
+                >> Writer.appendToBuffer (toChar v)
+            )
+
+        ( InString, Reader.Escaped '"' ) ->
+            ( formater
+            , writer
+                |> Writer.appendToBuffer '\\'
+                |> Writer.appendToBuffer '"'
+            )
+
+        ( InString, Reader.DoubleQuote ) ->
+            ( { formater | stringState = NoString }
+            , writer
+                |> Writer.appendToBuffer '"'
+                >> Writer.flushBufferAsColoredText
+                    formater.options.stringColor
+            )
+
+        -- ( JsonString jsonFormater, '"' ) ->
+        --     if formater.escapeNext then
+        --         let
+        --             ( newJsonFormater, newWriter ) =
+        --                 Json.parseChar c ( jsonFormater, writer )
+        --         in
+        --             ( { formater
+        --                 | escapeNext = False
+        --                 , stringState = JsonString newJsonFormater
+        --               }
+        --             , newWriter
+        --             )
+        --     else
+        --         let
+        --             ( newJsonFormater, newWriter ) =
+        --                 Json.parseEOF ( jsonFormater, writer )
+        --         in
+        --             ( { formater
+        --                 | escapeNext = False
+        --                 , stringState = NoString
+        --               }
+        --             , newWriter
+        --                 |> Writer.appendToBuffer '`'
+        --                 >> Writer.flushBufferAsText
+        --                 >> Writer.flushCurrentLine
+        --             )
+        -- ( JsonString jsonFormater, c ) ->
+        --     let
+        --         ( newJsonFormater, newWriter ) =
+        --             Json.parseChar c ( jsonFormater, writer )
+        --     in
+        --         ( { formater
+        --             | escapeNext = False
+        --             , stringState = JsonString newJsonFormater
+        --           }
+        --         , newWriter
+        --         )
+        -- TODO: remove once JsonFormater refactored
+        ( JsonString _, _ ) ->
+            ( formater, writer )
+
+        ( _, Reader.Escaped c ) ->
+            ( formater
+            , writer
+                |> Writer.appendToBuffer '\\'
+                |> Writer.appendToBuffer c
+            )
+
+        ( _, v ) ->
+            ( formater
+            , writer |> Writer.appendToBuffer (toChar v)
+            )
 
 
 parseEOF : ( Reader, ( Formater, Writer msg ) ) -> ( Reader, ( Formater, Writer msg ) )

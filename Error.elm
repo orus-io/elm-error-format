@@ -3,6 +3,7 @@ module Error exposing (..)
 import Html exposing (Html, Attribute, div, text, span)
 import Html.Attributes exposing (style)
 import Formater exposing (Formater)
+import Reader
 import Writer exposing (Writer)
 
 
@@ -34,8 +35,10 @@ formatErrString : String -> Html msg
 formatErrString error =
     String.foldl
         Formater.read
-        ( Formater.newReader
-        , ( Formater.new Formater.defaultOptions, Writer.init )
+        ( Reader.new
+        , ( Formater.new Formater.defaultOptions
+          , Writer.init
+          )
         )
         error
         |> Formater.parseEOF
