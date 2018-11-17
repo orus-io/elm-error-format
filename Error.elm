@@ -2,8 +2,8 @@ module Error exposing (..)
 
 import Html exposing (Html, Attribute, div, text, span)
 import Html.Attributes exposing (style)
-import Writer exposing (Writer)
 import Formater exposing (Formater)
+import Writer exposing (Writer)
 
 
 type alias Model =
@@ -33,9 +33,12 @@ view model =
 formatErrString : String -> Html msg
 formatErrString error =
     String.foldl
-        Formater.parseChar
-        ( Formater.newFormater Formater.formaterDefaultOptions, Writer.init )
+        Formater.read
+        ( Formater.newReader
+        , ( Formater.new Formater.defaultOptions, Writer.init )
+        )
         error
         |> Formater.parseEOF
+        |> Tuple.second
         |> Tuple.second
         |> Writer.render
