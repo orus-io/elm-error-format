@@ -263,6 +263,22 @@ parseInputChar c ( formater, writer ) =
                     formater.options.stringColor
             )
 
+        ( InString, Reader.LBrace ) ->
+            {- Enter JSON -}
+            let
+                ( jsonFormater, newWriter ) =
+                    Json.parseChar Reader.LBrace
+                        ( Json.init Json.defaultOptions
+                        , writer
+                            |> Writer.appendToBuffer '"'
+                            >> Writer.flushBufferAsColoredText
+                                formater.options.stringColor
+                        )
+            in
+                ( { formater | stringState = JsonString jsonFormater }
+                , newWriter
+                )
+
         ( InString, c ) ->
             if
                 (not (Buffer.isEmpty writer.buffer)
