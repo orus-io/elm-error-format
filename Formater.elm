@@ -107,14 +107,14 @@ openContext :
     -> InputChar
     -> ( Formater, Writer msg )
     -> ( Formater, Writer msg )
-openContext t v ( formater, writer ) =
+openContext t c ( formater, writer ) =
     ( formater
         |> pushContext t
     , writer
         |> Writer.flushBufferAsText
         >> Writer.flushCurrentLine
         >> Writer.indent
-        >> Writer.appendToBuffer (toChar v)
+        >> Writer.appendToBuffer (toChar c)
         >> Writer.appendSingleSpace
     )
 
@@ -124,13 +124,13 @@ closeContext :
     -> InputChar
     -> ( Formater, Writer msg )
     -> ( Formater, Writer msg )
-closeContext t v ( formater, writer ) =
+closeContext t c ( formater, writer ) =
     ( formater
         |> popContext
     , writer
         |> Writer.flushBufferAsText
         >> Writer.flushCurrentLine
-        >> Writer.writeText (String.fromChar <| toChar v)
+        >> Writer.writeText (String.fromChar <| toChar c)
         >> Writer.flushCurrentLine
         >> Writer.unindent
     )
@@ -138,48 +138,7 @@ closeContext t v ( formater, writer ) =
 
 parseInputChar : InputChar -> ( Formater, Writer msg ) -> ( Formater, Writer msg )
 parseInputChar c ( formater, writer ) =
-    checkUrl c ( formater, writer )
-        |> parse c
-
-
-checkUrl : InputChar -> ( Formater, Writer msg ) -> ( Formater, Writer msg )
-checkUrl c ( formater, writer ) =
-    case formater.stringState of
-        InString ->
-            if
-                (not (Buffer.isEmpty writer.buffer)
-                    && Buffer.length writer.buffer
-                    == 5
-                    && Buffer.take 4 writer.buffer
-                    == [ 'p', 't', 't', 'h' ]
-                )
-            then
-                ( { formater
-                    | stringState = UrlString Url.init
-                  }
-                , writer
-                )
-            else
-                ( formater, writer )
-
-        _ ->
-            ( formater, writer )
-
-
-parse : InputChar -> ( Formater, Writer msg ) -> ( Formater, Writer msg )
-parse c ( formater, writer ) =
     case ( formater.stringState, c ) of
-        ( JsonString jsonFormater, Reader.Escaped '\\' ) ->
-            let
-                ( newJsonFormater, newWriter ) =
-                    Json.parseChar (Reader.Escaped '\\') ( jsonFormater, writer )
-            in
-                ( { formater
-                    | stringState = JsonString newJsonFormater
-                  }
-                , newWriter
-                )
-
         ( NoString, Reader.LBrace ) ->
             ( formater, writer ) |> openContext Record Reader.LBrace
 
@@ -252,7 +211,7 @@ parse c ( formater, writer ) =
             {- Enter JSON -}
             let
                 ( jsonFormater, newWriter ) =
-                    Json.parseChar c
+                    Json.parseChar Reader.LBrace
                         ( Json.init Json.defaultOptions
                         , writer
                             |> Writer.appendToBuffer '`'
@@ -267,8 +226,7 @@ parse c ( formater, writer ) =
             {- Enter JSON -}
             let
                 ( jsonFormater, newWriter ) =
-                    Json.parseChar
-                        c
+                    Json.parseChar Reader.LBracket
                         ( Json.init Json.defaultOptions
                         , writer
                             |> Writer.appendToBuffer '`'
@@ -279,11 +237,11 @@ parse c ( formater, writer ) =
                 , newWriter
                 )
 
-        ( FirstChar, v ) ->
+        ( FirstChar, c ) ->
             ( { formater | stringState = InString }
             , writer
                 |> Writer.appendToBuffer '"'
-                >> Writer.appendToBuffer (toChar v)
+                >> Writer.appendToBuffer (toChar c)
             )
 
         ( InString, Reader.Escaped '"' ) ->
@@ -300,6 +258,37 @@ parse c ( formater, writer ) =
                 >> Writer.flushBufferAsColoredText
                     formater.options.stringColor
             )
+
+        ( InString, c ) ->
+            {- Enter Url -}
+            if
+                (not (Buffer.isEmpty writer.buffer)
+                    && Buffer.length writer.buffer
+                    >= 5
+                    && Buffer.take 4 writer.buffer
+                    == [ 'p', 't', 't', 'h' ]
+                )
+            then
+                ( { formater
+                    | stringState = UrlString Url.init
+                  }
+                , writer |> Writer.appendToBuffer (toChar c)
+                )
+            else
+                ( formater
+                , writer |> Writer.appendToBuffer (toChar c)
+                )
+
+        ( JsonString jsonFormater, Reader.Escaped '\\' ) ->
+            let
+                ( newJsonFormater, newWriter ) =
+                    Json.parseChar (Reader.Escaped '\\') ( jsonFormater, writer )
+            in
+                ( { formater
+                    | stringState = JsonString newJsonFormater
+                  }
+                , newWriter
+                )
 
         ( JsonString jsonFormater, Reader.Escaped '"' ) ->
             let
@@ -329,10 +318,10 @@ parse c ( formater, writer ) =
                     >> Writer.flushCurrentLine
                 )
 
-        ( JsonString jsonFormater, char ) ->
+        ( JsonString jsonFormater, c ) ->
             let
                 ( newJsonFormater, newWriter ) =
-                    Json.parseChar char ( jsonFormater, writer )
+                    Json.parseChar c ( jsonFormater, writer )
             in
                 ( { formater
                     | stringState = JsonString newJsonFormater
@@ -359,10 +348,10 @@ parse c ( formater, writer ) =
                 >> Writer.flushCurrentLine
             )
 
-        ( UrlString urlFormater, char ) ->
+        ( UrlString urlFormater, c ) ->
             let
                 ( newUrlFormater, newWriter ) =
-                    Url.parseChar char ( urlFormater, writer )
+                    Url.parseChar c ( urlFormater, writer )
             in
                 ( { formater
                     | stringState = UrlString newUrlFormater
@@ -370,9 +359,9 @@ parse c ( formater, writer ) =
                 , newWriter
                 )
 
-        ( _, v ) ->
+        ( _, c ) ->
             ( formater
-            , writer |> Writer.appendToBuffer (toChar v)
+            , writer |> Writer.appendToBuffer (toChar c)
             )
 
 

@@ -33,7 +33,7 @@ checkConvert c ( formater, writer ) =
         )
         |> Maybe.map
             (\c ->
-                ( formater
+                ( { formater | moduloSeen = False }
                 , writer
                     |> Writer.dropBuffer 3
                     |> Writer.appendToBuffer c

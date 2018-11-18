@@ -39,10 +39,10 @@ init options =
 
 
 openContext : InputChar -> ( Formater, Writer msg ) -> ( Formater, Writer msg )
-openContext v ( formater, writer ) =
+openContext c ( formater, writer ) =
     ( formater
     , writer
-        |> Writer.appendToBuffer (toChar v)
+        |> Writer.appendToBuffer (toChar c)
         >> Writer.flushBufferAsText
         >> Writer.flushCurrentLine
         >> Writer.indent
@@ -50,12 +50,12 @@ openContext v ( formater, writer ) =
 
 
 closeContext : InputChar -> ( Formater, Writer msg ) -> ( Formater, Writer msg )
-closeContext v ( formater, writer ) =
+closeContext c ( formater, writer ) =
     ( formater
     , writer
         |> Writer.flushBufferAsText
         >> Writer.flushCurrentLine
-        >> Writer.writeText (String.fromChar <| toChar v)
+        >> Writer.writeText (String.fromChar <| toChar c)
         >> Writer.unindent
     )
 
