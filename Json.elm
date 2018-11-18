@@ -85,6 +85,7 @@ parseChar c ( formater, writer ) =
             )
 
         ( False, Reader.Escaped '"' ) ->
+            {- Enter Json inString -}
             ( { formater
                 | inString = True
               }
@@ -99,6 +100,7 @@ parseChar c ( formater, writer ) =
             )
 
         ( True, Reader.Escaped '"' ) ->
+            {- Exit Json inString -}
             ( { formater
                 | inString = False
               }
@@ -108,10 +110,15 @@ parseChar c ( formater, writer ) =
                     formater.options.stringColor
             )
 
+        ( True, Reader.Escaped c ) ->
+            ( formater
+            , writer
+                |> Writer.appendToBuffer '\\'
+                |> Writer.appendToBuffer (Reader.toChar <| Reader.Escaped c)
+            )
+
         ( _, c ) ->
-            ( { formater
-                | escapeNext = False
-              }
+            ( formater
             , writer
                 |> Writer.appendToBuffer (Reader.toChar c)
             )
