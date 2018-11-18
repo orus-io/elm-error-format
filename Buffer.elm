@@ -33,3 +33,23 @@ rstrip c b =
 toString : Buffer -> String
 toString =
     List.reverse >> String.fromList
+
+
+length : Buffer -> Int
+length =
+    List.length
+
+
+take : Int -> Buffer -> Buffer
+take =
+    List.take
+
+
+isEmpty : Buffer -> Bool
+isEmpty =
+    List.isEmpty
+
+
+drop : Int -> Buffer -> Buffer
+drop =
+    List.drop

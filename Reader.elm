@@ -12,6 +12,8 @@ type InputChar
     | RParenthesis
     | DoubleQuote
     | Comma
+    | Modulo
+    | QuestionMark
     | Escaped Char
     | Common Char
 
@@ -85,6 +87,12 @@ toChar v =
         Comma ->
             ','
 
+        Modulo ->
+            '%'
+
+        QuestionMark ->
+            '?'
+
         Common c ->
             c
 
@@ -118,6 +126,12 @@ fromChar v =
 
         ',' ->
             Comma
+
+        '%' ->
+            Modulo
+
+        '?' ->
+            QuestionMark
 
         c ->
             Common c

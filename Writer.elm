@@ -34,6 +34,11 @@ popBuffer w =
     )
 
 
+dropBuffer : Int -> Writer msg -> Writer msg
+dropBuffer n w =
+    { w | buffer = Buffer.drop n w.buffer }
+
+
 appendToBuffer : Char -> Writer msg -> Writer msg
 appendToBuffer c w =
     case ( w.ignoreNextSpace, c ) of

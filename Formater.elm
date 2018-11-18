@@ -1,7 +1,9 @@
 module Formater exposing (..)
 
 import Writer exposing (Writer)
+import Buffer
 import Json
+import Url
 import Reader
     exposing
         ( Reader
@@ -24,6 +26,7 @@ type StringState
     | FirstChar
     | InString
     | JsonString Json.Formater
+    | UrlString Url.Formater
 
 
 
@@ -133,6 +136,30 @@ closeContext t v ( formater, writer ) =
         >> Writer.flushCurrentLine
         >> Writer.unindent
     )
+
+
+checkUrl : InputChar -> ( Formater, Writer msg ) -> ( Formater, Writer msg )
+checkUrl c ( formater, writer ) =
+    case formater.stringState of
+        InString ->
+            if
+                (not (Buffer.isEmpty writer.buffer)
+                    && Buffer.length writer.buffer
+                    == 5
+                    && Buffer.take 4 writer.buffer
+                    == [ 'p', 't', 't', 'h' ]
+                )
+            then
+                ( { formater
+                    | stringState = UrlString Url.init
+                  }
+                , writer
+                )
+            else
+                ( formater, writer )
+
+        _ ->
+            ( formater, writer )
 
 
 parseInputChar : InputChar -> ( Formater, Writer msg ) -> ( Formater, Writer msg )
@@ -284,6 +311,7 @@ parseInputChar c ( formater, writer ) =
                 )
 
         ( JsonString jsonFormater, Reader.DoubleQuote ) ->
+            {- Exit Json -}
             let
                 ( newJsonFormater, newWriter ) =
                     Json.parseEOF ( jsonFormater, writer )
@@ -315,10 +343,34 @@ parseInputChar c ( formater, writer ) =
                 |> Writer.appendToBuffer c
             )
 
+        ( UrlString urlFormater, Reader.DoubleQuote ) ->
+            {- Exit Url -}
+            ( { formater
+                | stringState = NoString
+              }
+            , writer
+                |> Writer.appendToBuffer '"'
+                >> Writer.flushBufferAsColoredText
+                    formater.options.stringColor
+                >> Writer.flushCurrentLine
+            )
+
+        ( UrlString urlFormater, char ) ->
+            let
+                ( newUrlFormater, newWriter ) =
+                    Url.parseChar char ( urlFormater, writer )
+            in
+                ( { formater
+                    | stringState = UrlString newUrlFormater
+                  }
+                , newWriter
+                )
+
         ( _, v ) ->
             ( formater
             , writer |> Writer.appendToBuffer (toChar v)
             )
+                {- Enter Url? -} |> checkUrl v
 
 
 parseEOF : ( Reader, ( Formater, Writer msg ) ) -> ( Reader, ( Formater, Writer msg ) )
