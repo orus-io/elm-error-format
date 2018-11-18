@@ -26,6 +26,11 @@ view model =
         [ style
             [ ( "font-family", "monospace" )
             , ( "font-size", "0.8rem" )
+
+            {- Dark mode
+               , ( "background", "black" )
+               , ( "color", "grey" )
+            -}
             ]
         ]
         [ formatErrString model ]

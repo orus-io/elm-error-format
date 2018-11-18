@@ -1,0 +1,23 @@
+{
+    "version": "1.0.0",
+    "summary": "elm error messages HTML pretty printer",
+    "repository": "https://github.com/orus-io/elm-error-format.git",
+    "license": "MIT",
+    "source-directories": [
+        "src/"
+    ],
+    "exposed-modules": [
+        "Buffer",
+        "Error",
+        "Formater",
+        "Json",
+        "Reader",
+        "Url",
+        "Writer"
+    ],
+    "dependencies": {
+        "elm-lang/core": "5.1.1 <= v < 6.0.0",
+        "elm-lang/html": "2.0.0 <= v < 3.0.0"
+    },
+    "elm-version": "0.18.0 <= v < 0.19.0"
+}

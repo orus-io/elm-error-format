@@ -18,7 +18,7 @@ type alias Options =
 
 defaultOptions : Options
 defaultOptions =
-    { stringColor = "orangered" }
+    { stringColor = "#0066a7" }
 
 
 type alias Formater =
