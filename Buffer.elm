@@ -41,8 +41,8 @@ length =
 
 
 take : Int -> Buffer -> Buffer
-take =
-    List.take
+take i =
+    List.take i >> List.reverse
 
 
 isEmpty : Buffer -> Bool

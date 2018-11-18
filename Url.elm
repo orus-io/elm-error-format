@@ -28,7 +28,6 @@ checkConvert : InputChar -> ( Formater, Writer msg ) -> ( Formater, Writer msg )
 checkConvert c ( formater, writer ) =
     getChar
         (Buffer.take 2 writer.buffer
-            |> List.reverse
             |> String.fromList
         )
         |> Maybe.map

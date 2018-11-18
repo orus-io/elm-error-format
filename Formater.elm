@@ -267,15 +267,15 @@ parseInputChar c ( formater, writer ) =
             )
 
         ( InString, c ) ->
-            {- Enter Url -}
             if
                 (not (Buffer.isEmpty writer.buffer)
                     && Buffer.length writer.buffer
                     >= 5
                     && Buffer.take 4 writer.buffer
-                    == [ 'p', 't', 't', 'h' ]
+                    == [ 'h', 't', 't', 'p' ]
                 )
             then
+                {- Enter Url -}
                 ( { formater
                     | stringState = UrlString Url.init
                   }
