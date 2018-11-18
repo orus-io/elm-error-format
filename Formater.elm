@@ -70,7 +70,6 @@ type alias Formater =
     { options : FormaterOptions
     , contextStack : List ComplexType
     , stringState : StringState
-    , escapeNext : Bool
     }
 
 
@@ -79,7 +78,6 @@ new options =
     { options = options
     , contextStack = []
     , stringState = NoString
-    , escapeNext = False
     }
 
 
@@ -138,6 +136,12 @@ closeContext t v ( formater, writer ) =
     )
 
 
+parseInputChar : InputChar -> ( Formater, Writer msg ) -> ( Formater, Writer msg )
+parseInputChar c ( formater, writer ) =
+    checkUrl c ( formater, writer )
+        |> parse c
+
+
 checkUrl : InputChar -> ( Formater, Writer msg ) -> ( Formater, Writer msg )
 checkUrl c ( formater, writer ) =
     case formater.stringState of
@@ -162,8 +166,8 @@ checkUrl c ( formater, writer ) =
             ( formater, writer )
 
 
-parseInputChar : InputChar -> ( Formater, Writer msg ) -> ( Formater, Writer msg )
-parseInputChar c ( formater, writer ) =
+parse : InputChar -> ( Formater, Writer msg ) -> ( Formater, Writer msg )
+parse c ( formater, writer ) =
     case ( formater.stringState, c ) of
         ( JsonString jsonFormater, Reader.Escaped '\\' ) ->
             let
@@ -370,7 +374,6 @@ parseInputChar c ( formater, writer ) =
             ( formater
             , writer |> Writer.appendToBuffer (toChar v)
             )
-                {- Enter Url? -} |> checkUrl v
 
 
 parseEOF : ( Reader, ( Formater, Writer msg ) ) -> ( Reader, ( Formater, Writer msg ) )

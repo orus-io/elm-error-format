@@ -24,7 +24,6 @@ defaultOptions =
 type alias Formater =
     { options : Options
     , inString : Bool
-    , escapeNext : Bool
     }
 
 
@@ -32,7 +31,6 @@ init : Options -> Formater
 init options =
     { options = options
     , inString = False
-    , escapeNext = False
     }
 
 
