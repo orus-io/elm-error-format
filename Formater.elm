@@ -119,12 +119,8 @@ openContext t c ( formater, writer ) =
     )
 
 
-closeContext :
-    ComplexType
-    -> InputChar
-    -> ( Formater, Writer msg )
-    -> ( Formater, Writer msg )
-closeContext t c ( formater, writer ) =
+closeContext : InputChar -> ( Formater, Writer msg ) -> ( Formater, Writer msg )
+closeContext c ( formater, writer ) =
     ( formater
         |> popContext
     , writer
@@ -143,13 +139,13 @@ parseInputChar c ( formater, writer ) =
             ( formater, writer ) |> openContext Record Reader.LBrace
 
         ( NoString, Reader.RBrace ) ->
-            ( formater, writer ) |> closeContext Record Reader.RBrace
+            ( formater, writer ) |> closeContext Reader.RBrace
 
         ( NoString, Reader.LBracket ) ->
             ( formater, writer ) |> openContext List Reader.LBracket
 
         ( NoString, Reader.RBracket ) ->
-            ( formater, writer ) |> closeContext List Reader.RBracket
+            ( formater, writer ) |> closeContext Reader.RBracket
 
         ( NoString, Reader.LParenthesis ) ->
             ( formater
@@ -214,8 +210,9 @@ parseInputChar c ( formater, writer ) =
                     Json.parseChar Reader.LBrace
                         ( Json.init Json.defaultOptions
                         , writer
-                            |> Writer.appendToBuffer '`'
-                            >> Writer.flushBufferAsText
+                            |> Writer.appendToBuffer '"'
+                            >> Writer.flushBufferAsColoredText
+                                formater.options.stringColor
                         )
             in
                 ( { formater | stringState = JsonString jsonFormater }
@@ -311,30 +308,50 @@ parseInputChar c ( formater, writer ) =
                 )
 
         ( JsonString jsonFormater, Reader.DoubleQuote ) ->
-            {- Exit Json -}
             let
+                endOfJson =
+                    List.isEmpty jsonFormater.contextStack
+
                 ( newJsonFormater, newWriter ) =
-                    Json.parseEOF ( jsonFormater, writer )
+                    if endOfJson then
+                        {- Exit Json -}
+                        Json.parseEOF ( jsonFormater, writer )
+                    else
+                        Json.parseChar c ( jsonFormater, writer )
             in
-                ( { formater
-                    | stringState = NoString
-                  }
-                , newWriter
-                    |> Writer.appendToBuffer '`'
-                    >> Writer.flushBufferAsText
-                    >> Writer.flushCurrentLine
-                )
+                if endOfJson then
+                    ( { formater | stringState = NoString }
+                    , newWriter
+                        |> Writer.appendToBuffer '"'
+                        >> Writer.flushBufferAsColoredText
+                            formater.options.stringColor
+                    )
+                else
+                    ( { formater | stringState = JsonString newJsonFormater }
+                    , newWriter
+                    )
 
         ( JsonString jsonFormater, c ) ->
             let
+                endOfJson =
+                    List.isEmpty jsonFormater.contextStack
+
                 ( newJsonFormater, newWriter ) =
-                    Json.parseChar c ( jsonFormater, writer )
+                    if endOfJson then
+                        {- Exit Json -}
+                        Json.parseEOF ( jsonFormater, writer )
+                    else
+                        Json.parseChar c ( jsonFormater, writer )
             in
-                ( { formater
-                    | stringState = JsonString newJsonFormater
-                  }
-                , newWriter
-                )
+                if endOfJson then
+                    ( { formater | stringState = InString }
+                    , newWriter
+                        |> Writer.appendToBuffer (toChar c)
+                    )
+                else
+                    ( { formater | stringState = JsonString newJsonFormater }
+                    , newWriter
+                    )
 
         ( _, Reader.Escaped c ) ->
             ( formater
