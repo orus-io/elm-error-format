@@ -251,6 +251,13 @@ parseInputChar c ( formater, writer ) =
                 |> Writer.appendToBuffer '"'
             )
 
+        ( InString, Reader.Escaped c ) ->
+            ( formater
+            , writer
+                |> Writer.appendToBuffer '\\'
+                |> Writer.appendToBuffer c
+            )
+
         ( InString, Reader.DoubleQuote ) ->
             ( { formater | stringState = NoString }
             , writer
