@@ -42,7 +42,7 @@ read :
     -> ( Reader, ( Formater, Writer msg ) )
     -> ( Reader, ( Formater, Writer msg ) )
 read =
-    formaterRead parseInputChar
+    formaterRead parseChar
 
 
 eof :
@@ -156,11 +156,11 @@ closeContext c ( formater, writer ) =
     )
 
 
-parseInputCharNoString :
+parseNoString :
     InputChar
     -> ( Formater, Writer msg )
     -> ( Formater, Writer msg )
-parseInputCharNoString c ( formater, writer ) =
+parseNoString c ( formater, writer ) =
     case c of
         Reader.LBrace ->
             ( formater, writer ) |> openContext Record Reader.LBrace
@@ -234,11 +234,11 @@ parseInputCharNoString c ( formater, writer ) =
             )
 
 
-parseInputCharFirstChar :
+parseFirstChar :
     InputChar
     -> ( Formater, Writer msg )
     -> ( Formater, Writer msg )
-parseInputCharFirstChar c ( formater, writer ) =
+parseFirstChar c ( formater, writer ) =
     case c of
         Reader.Escaped c ->
             ( { formater | stringState = InString StringFmt }
@@ -304,11 +304,11 @@ parseInputCharFirstChar c ( formater, writer ) =
             )
 
 
-parseInputCharInString :
+parseInString :
     InputChar
     -> ( Formater, Writer msg )
     -> ( Formater, Writer msg )
-parseInputCharInString c ( formater, writer ) =
+parseInString c ( formater, writer ) =
     case c of
         Reader.Escaped '"' ->
             ( formater
@@ -375,12 +375,12 @@ parseInputCharInString c ( formater, writer ) =
                 )
 
 
-parseInputCharJsonString :
+parseJsonString :
     Json.Formater
     -> InputChar
     -> ( Formater, Writer msg )
     -> ( Formater, Writer msg )
-parseInputCharJsonString jsonFormater c ( formater, writer ) =
+parseJsonString jsonFormater c ( formater, writer ) =
     case c of
         Reader.Escaped '\\' ->
             let
@@ -467,12 +467,12 @@ parseInputCharJsonString jsonFormater c ( formater, writer ) =
                     )
 
 
-parseInputCharUrlString :
+parseUrlString :
     Url.Formater
     -> InputChar
     -> ( Formater, Writer msg )
     -> ( Formater, Writer msg )
-parseInputCharUrlString urlFormater c ( formater, writer ) =
+parseUrlString urlFormater c ( formater, writer ) =
     case c of
         Reader.DoubleQuote ->
             {- Exit Url -}
@@ -512,20 +512,20 @@ parseInputCharUrlString urlFormater c ( formater, writer ) =
                 )
 
 
-parseInputChar : InputChar -> ( Formater, Writer msg ) -> ( Formater, Writer msg )
-parseInputChar c ( formater, writer ) =
+parseChar : InputChar -> ( Formater, Writer msg ) -> ( Formater, Writer msg )
+parseChar c ( formater, writer ) =
     case formater.stringState of
         NoString ->
-            parseInputCharNoString c ( formater, writer )
+            parseNoString c ( formater, writer )
 
         FirstChar ->
-            parseInputCharFirstChar c ( formater, writer )
+            parseFirstChar c ( formater, writer )
 
         InString StringFmt ->
-            parseInputCharInString c ( formater, writer )
+            parseInString c ( formater, writer )
 
         InString (JsonFmt jsonFormater) ->
-            parseInputCharJsonString jsonFormater c ( formater, writer )
+            parseJsonString jsonFormater c ( formater, writer )
 
         InString (UrlFmt urlFormater) ->
-            parseInputCharUrlString urlFormater c ( formater, writer )
+            parseUrlString urlFormater c ( formater, writer )
