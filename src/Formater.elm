@@ -21,12 +21,16 @@ type ComplexType
     | Tuple
 
 
+type SubFormater
+    = StringFmt
+    | JsonFmt Json.Formater
+    | UrlFmt Url.Formater
+
+
 type StringState
     = NoString
     | FirstChar
-    | InString
-    | JsonString Json.Formater
-    | UrlString Url.Formater
+    | InString SubFormater
 
 
 
@@ -224,7 +228,7 @@ parseInputCharFirstChar :
 parseInputCharFirstChar c ( formater, writer ) =
     case c of
         Reader.Escaped c ->
-            ( { formater | stringState = InString }
+            ( { formater | stringState = InString StringFmt }
             , writer
                 |> Writer.appendToBuffer '"'
                 |> Writer.appendToBuffer '\\'
@@ -252,7 +256,7 @@ parseInputCharFirstChar c ( formater, writer ) =
                                 formater.options.stringColor
                         )
             in
-                ( { formater | stringState = JsonString jsonFormater }
+                ( { formater | stringState = InString <| JsonFmt jsonFormater }
                 , newWriter
                 )
 
@@ -268,7 +272,7 @@ parseInputCharFirstChar c ( formater, writer ) =
                                 formater.options.stringColor
                         )
             in
-                ( { formater | stringState = JsonString jsonFormater }
+                ( { formater | stringState = InString <| JsonFmt jsonFormater }
                 , newWriter
                 )
 
@@ -280,7 +284,7 @@ parseInputCharFirstChar c ( formater, writer ) =
             )
 
         c ->
-            ( { formater | stringState = InString }
+            ( { formater | stringState = InString StringFmt }
             , writer
                 |> Writer.appendToBuffer '"'
                 >> Writer.appendToBuffer (toChar c)
@@ -327,7 +331,7 @@ parseInputCharInString c ( formater, writer ) =
                                 formater.options.stringColor
                         )
             in
-                ( { formater | stringState = JsonString jsonFormater }
+                ( { formater | stringState = InString <| JsonFmt jsonFormater }
                 , newWriter
                 )
 
@@ -348,7 +352,7 @@ parseInputCharInString c ( formater, writer ) =
             then
                 {- Enter Url -}
                 ( { formater
-                    | stringState = UrlString Url.init
+                    | stringState = InString <| UrlFmt Url.init
                   }
                 , writer |> Writer.appendToBuffer (toChar c)
                 )
@@ -371,7 +375,7 @@ parseInputCharJsonString jsonFormater c ( formater, writer ) =
                     Json.parseChar (Reader.Escaped '\\') ( jsonFormater, writer )
             in
                 ( { formater
-                    | stringState = JsonString newJsonFormater
+                    | stringState = InString <| JsonFmt newJsonFormater
                   }
                 , newWriter
                 )
@@ -384,7 +388,7 @@ parseInputCharJsonString jsonFormater c ( formater, writer ) =
                         ( jsonFormater, writer )
             in
                 ( { formater
-                    | stringState = JsonString newJsonFormater
+                    | stringState = InString <| JsonFmt newJsonFormater
                   }
                 , newWriter
                 )
@@ -409,7 +413,7 @@ parseInputCharJsonString jsonFormater c ( formater, writer ) =
                             formater.options.stringColor
                     )
                 else
-                    ( { formater | stringState = JsonString newJsonFormater }
+                    ( { formater | stringState = InString <| JsonFmt newJsonFormater }
                     , newWriter
                     )
 
@@ -440,12 +444,12 @@ parseInputCharJsonString jsonFormater c ( formater, writer ) =
                         Json.parseChar c ( jsonFormater, writer )
             in
                 if endOfJson then
-                    ( { formater | stringState = InString }
+                    ( { formater | stringState = InString StringFmt }
                     , newWriter
                         |> Writer.appendToBuffer (toChar c)
                     )
                 else
-                    ( { formater | stringState = JsonString newJsonFormater }
+                    ( { formater | stringState = InString <| JsonFmt newJsonFormater }
                     , newWriter
                     )
 
@@ -489,7 +493,7 @@ parseInputCharUrlString urlFormater c ( formater, writer ) =
                     Url.parseChar c ( urlFormater, writer )
             in
                 ( { formater
-                    | stringState = UrlString newUrlFormater
+                    | stringState = InString <| UrlFmt newUrlFormater
                   }
                 , newWriter
                 )
@@ -504,11 +508,11 @@ parseInputChar c ( formater, writer ) =
         FirstChar ->
             parseInputCharFirstChar c ( formater, writer )
 
-        InString ->
+        InString StringFmt ->
             parseInputCharInString c ( formater, writer )
 
-        JsonString jsonFormater ->
+        InString (JsonFmt jsonFormater) ->
             parseInputCharJsonString jsonFormater c ( formater, writer )
 
-        UrlString urlFormater ->
+        InString (UrlFmt urlFormater) ->
             parseInputCharUrlString urlFormater c ( formater, writer )
