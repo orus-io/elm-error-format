@@ -5,7 +5,7 @@ help:  ## Display this help message
 
 run:  ## Run demo app
 	export PATH=$$(pwd)/node_modules/.bin:$$PATH && \
-		cd src && \
+		cd demo && \
 			sysconfcpus -n 1 \
 			elm-live \
 			--port=8044 \
