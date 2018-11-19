@@ -139,22 +139,25 @@ closeContext c ( formater, writer ) =
     )
 
 
-parseInputChar : InputChar -> ( Formater, Writer msg ) -> ( Formater, Writer msg )
-parseInputChar c ( formater, writer ) =
-    case ( formater.stringState, c ) of
-        ( NoString, Reader.LBrace ) ->
+parseInputCharNoString :
+    InputChar
+    -> ( Formater, Writer msg )
+    -> ( Formater, Writer msg )
+parseInputCharNoString c ( formater, writer ) =
+    case c of
+        Reader.LBrace ->
             ( formater, writer ) |> openContext Record Reader.LBrace
 
-        ( NoString, Reader.RBrace ) ->
+        Reader.RBrace ->
             ( formater, writer ) |> closeContext Reader.RBrace
 
-        ( NoString, Reader.LBracket ) ->
+        Reader.LBracket ->
             ( formater, writer ) |> openContext List Reader.LBracket
 
-        ( NoString, Reader.RBracket ) ->
+        Reader.RBracket ->
             ( formater, writer ) |> closeContext Reader.RBracket
 
-        ( NoString, Reader.LParenthesis ) ->
+        Reader.LParenthesis ->
             ( formater
                 |> pushContext Tuple
             , writer
@@ -162,7 +165,7 @@ parseInputChar c ( formater, writer ) =
                 >> Writer.appendSingleSpace
             )
 
-        ( NoString, Reader.RParenthesis ) ->
+        Reader.RParenthesis ->
             ( formater
                 |> popContext
             , writer
@@ -170,7 +173,7 @@ parseInputChar c ( formater, writer ) =
                 >> Writer.appendToBuffer ')'
             )
 
-        ( NoString, Reader.Comma ) ->
+        Reader.Comma ->
             case currentContext formater of
                 Just Tuple ->
                     ( formater
@@ -188,13 +191,39 @@ parseInputChar c ( formater, writer ) =
                         >> Writer.appendSingleSpace
                     )
 
-        ( NoString, Reader.DoubleQuote ) ->
+        Reader.DoubleQuote ->
             ( { formater | stringState = FirstChar }
             , writer
                 |> Writer.flushBufferAsText
             )
 
-        ( FirstChar, Reader.Escaped c ) ->
+        Reader.Escaped c ->
+            ( formater
+            , writer
+                |> Writer.appendToBuffer '\\'
+                |> Writer.appendToBuffer c
+            )
+
+        Reader.EOF ->
+            ( formater
+            , writer
+                |> Writer.flushBufferAsText
+                >> Writer.flushCurrentLine
+            )
+
+        c ->
+            ( formater
+            , writer |> Writer.appendToBuffer (toChar c)
+            )
+
+
+parseInputCharFirstChar :
+    InputChar
+    -> ( Formater, Writer msg )
+    -> ( Formater, Writer msg )
+parseInputCharFirstChar c ( formater, writer ) =
+    case c of
+        Reader.Escaped c ->
             ( { formater | stringState = InString }
             , writer
                 |> Writer.appendToBuffer '"'
@@ -202,7 +231,7 @@ parseInputChar c ( formater, writer ) =
                 |> Writer.appendToBuffer c
             )
 
-        ( FirstChar, Reader.DoubleQuote ) ->
+        Reader.DoubleQuote ->
             ( { formater | stringState = NoString }
             , writer
                 |> Writer.appendToBuffer '"'
@@ -211,7 +240,7 @@ parseInputChar c ( formater, writer ) =
                     formater.options.stringColor
             )
 
-        ( FirstChar, Reader.LBrace ) ->
+        Reader.LBrace ->
             {- Enter JSON -}
             let
                 ( jsonFormater, newWriter ) =
@@ -227,7 +256,7 @@ parseInputChar c ( formater, writer ) =
                 , newWriter
                 )
 
-        ( FirstChar, Reader.LBracket ) ->
+        Reader.LBracket ->
             {- Enter JSON -}
             let
                 ( jsonFormater, newWriter ) =
@@ -243,28 +272,42 @@ parseInputChar c ( formater, writer ) =
                 , newWriter
                 )
 
-        ( FirstChar, c ) ->
+        Reader.EOF ->
+            ( formater
+            , writer
+                |> Writer.flushBufferAsText
+                >> Writer.flushCurrentLine
+            )
+
+        c ->
             ( { formater | stringState = InString }
             , writer
                 |> Writer.appendToBuffer '"'
                 >> Writer.appendToBuffer (toChar c)
             )
 
-        ( InString, Reader.Escaped '"' ) ->
+
+parseInputCharInString :
+    InputChar
+    -> ( Formater, Writer msg )
+    -> ( Formater, Writer msg )
+parseInputCharInString c ( formater, writer ) =
+    case c of
+        Reader.Escaped '"' ->
             ( formater
             , writer
                 |> Writer.appendToBuffer '\\'
                 |> Writer.appendToBuffer '"'
             )
 
-        ( InString, Reader.Escaped c ) ->
+        Reader.Escaped c ->
             ( formater
             , writer
                 |> Writer.appendToBuffer '\\'
                 |> Writer.appendToBuffer c
             )
 
-        ( InString, Reader.DoubleQuote ) ->
+        Reader.DoubleQuote ->
             ( { formater | stringState = NoString }
             , writer
                 |> Writer.appendToBuffer '"'
@@ -272,7 +315,7 @@ parseInputChar c ( formater, writer ) =
                     formater.options.stringColor
             )
 
-        ( InString, Reader.LBrace ) ->
+        Reader.LBrace ->
             {- Enter JSON -}
             let
                 ( jsonFormater, newWriter ) =
@@ -288,7 +331,14 @@ parseInputChar c ( formater, writer ) =
                 , newWriter
                 )
 
-        ( InString, c ) ->
+        Reader.EOF ->
+            ( formater
+            , writer
+                |> Writer.flushBufferAsText
+                >> Writer.flushCurrentLine
+            )
+
+        c ->
             if
                 not (Buffer.isEmpty writer.buffer)
                     && Buffer.length writer.buffer
@@ -307,7 +357,15 @@ parseInputChar c ( formater, writer ) =
                 , writer |> Writer.appendToBuffer (toChar c)
                 )
 
-        ( JsonString jsonFormater, Reader.Escaped '\\' ) ->
+
+parseInputCharJsonString :
+    Json.Formater
+    -> InputChar
+    -> ( Formater, Writer msg )
+    -> ( Formater, Writer msg )
+parseInputCharJsonString jsonFormater c ( formater, writer ) =
+    case c of
+        Reader.Escaped '\\' ->
             let
                 ( newJsonFormater, newWriter ) =
                     Json.parseChar (Reader.Escaped '\\') ( jsonFormater, writer )
@@ -318,7 +376,7 @@ parseInputChar c ( formater, writer ) =
                 , newWriter
                 )
 
-        ( JsonString jsonFormater, Reader.Escaped '"' ) ->
+        Reader.Escaped '"' ->
             let
                 ( newJsonFormater, newWriter ) =
                     Json.parseChar
@@ -331,7 +389,7 @@ parseInputChar c ( formater, writer ) =
                 , newWriter
                 )
 
-        ( JsonString jsonFormater, Reader.DoubleQuote ) ->
+        Reader.DoubleQuote ->
             let
                 endOfJson =
                     List.isEmpty jsonFormater.contextStack
@@ -355,7 +413,21 @@ parseInputChar c ( formater, writer ) =
                     , newWriter
                     )
 
-        ( JsonString jsonFormater, c ) ->
+        Reader.Escaped c ->
+            ( formater
+            , writer
+                |> Writer.appendToBuffer '\\'
+                |> Writer.appendToBuffer c
+            )
+
+        Reader.EOF ->
+            ( formater
+            , writer
+                |> Writer.flushBufferAsText
+                >> Writer.flushCurrentLine
+            )
+
+        c ->
             let
                 endOfJson =
                     List.isEmpty jsonFormater.contextStack
@@ -377,14 +449,15 @@ parseInputChar c ( formater, writer ) =
                     , newWriter
                     )
 
-        ( _, Reader.Escaped c ) ->
-            ( formater
-            , writer
-                |> Writer.appendToBuffer '\\'
-                |> Writer.appendToBuffer c
-            )
 
-        ( UrlString _, Reader.DoubleQuote ) ->
+parseInputCharUrlString :
+    Url.Formater
+    -> InputChar
+    -> ( Formater, Writer msg )
+    -> ( Formater, Writer msg )
+parseInputCharUrlString urlFormater c ( formater, writer ) =
+    case c of
+        Reader.DoubleQuote ->
             {- Exit Url -}
             ( { formater
                 | stringState = NoString
@@ -396,7 +469,21 @@ parseInputChar c ( formater, writer ) =
                 >> Writer.flushCurrentLine
             )
 
-        ( UrlString urlFormater, c ) ->
+        Reader.Escaped c ->
+            ( formater
+            , writer
+                |> Writer.appendToBuffer '\\'
+                |> Writer.appendToBuffer c
+            )
+
+        Reader.EOF ->
+            ( formater
+            , writer
+                |> Writer.flushBufferAsText
+                >> Writer.flushCurrentLine
+            )
+
+        c ->
             let
                 ( newUrlFormater, newWriter ) =
                     Url.parseChar c ( urlFormater, writer )
@@ -407,14 +494,21 @@ parseInputChar c ( formater, writer ) =
                 , newWriter
                 )
 
-        ( _, Reader.EOF ) ->
-            ( formater
-            , writer
-                |> Writer.flushBufferAsText
-                >> Writer.flushCurrentLine
-            )
 
-        ( _, c ) ->
-            ( formater
-            , writer |> Writer.appendToBuffer (toChar c)
-            )
+parseInputChar : InputChar -> ( Formater, Writer msg ) -> ( Formater, Writer msg )
+parseInputChar c ( formater, writer ) =
+    case formater.stringState of
+        NoString ->
+            parseInputCharNoString c ( formater, writer )
+
+        FirstChar ->
+            parseInputCharFirstChar c ( formater, writer )
+
+        InString ->
+            parseInputCharInString c ( formater, writer )
+
+        JsonString jsonFormater ->
+            parseInputCharJsonString jsonFormater c ( formater, writer )
+
+        UrlString urlFormater ->
+            parseInputCharUrlString urlFormater c ( formater, writer )
