@@ -1,10 +1,10 @@
 module Error exposing (..)
 
-import Html exposing (Html, Attribute, div, text, span)
+import Html exposing (Html, div)
 import Html.Attributes exposing (style, class)
-import Formater exposing (Formater)
+import Formater
 import Reader
-import Writer exposing (Writer)
+import Writer
 
 
 type alias Model =

@@ -3,8 +3,7 @@ module Json exposing (..)
 import Writer exposing (Writer)
 import Reader
     exposing
-        ( Reader
-        , InputChar
+        ( InputChar
         , toChar
         )
 

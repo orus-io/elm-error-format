@@ -283,12 +283,11 @@ parseInputChar c ( formater, writer ) =
 
         ( InString, c ) ->
             if
-                (not (Buffer.isEmpty writer.buffer)
+                not (Buffer.isEmpty writer.buffer)
                     && Buffer.length writer.buffer
                     >= 5
                     && Buffer.take 4 writer.buffer
                     == [ 'h', 't', 't', 'p' ]
-                )
             then
                 {- Enter Url -}
                 ( { formater
@@ -378,7 +377,7 @@ parseInputChar c ( formater, writer ) =
                 |> Writer.appendToBuffer c
             )
 
-        ( UrlString urlFormater, Reader.DoubleQuote ) ->
+        ( UrlString _, Reader.DoubleQuote ) ->
             {- Exit Url -}
             ( { formater
                 | stringState = NoString

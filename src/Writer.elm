@@ -114,7 +114,7 @@ unindent w =
 
 padding : Int -> Attribute msg
 padding indent =
-    style [ ( "padding-left", ((toString indent) ++ "rem") ) ]
+    style [ ( "padding-left", toString indent ++ "rem" ) ]
 
 
 flushCurrentLine : Writer msg -> Writer msg

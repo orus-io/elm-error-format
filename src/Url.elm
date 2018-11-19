@@ -5,8 +5,7 @@ import Buffer
 import Writer exposing (Writer)
 import Reader
     exposing
-        ( Reader
-        , InputChar
+        ( InputChar
         , toChar
         )
 

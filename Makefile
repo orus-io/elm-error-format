@@ -18,11 +18,19 @@ run:  ## Run demo app
 
 test:  ## Run tests
 	export PATH=$$(pwd)/node_modules/.bin:$$PATH && \
+		sysconfcpus -n 1 \
 		elm-test
 
 coverage:  ## Run tests with coverage
 	export PATH=$$(pwd)/node_modules/.bin:$$PATH && \
+		sysconfcpus -n 1 \
 		elm-coverage --open
+
+analyse:  ## Analyse source with elm-analyse
+	export PATH=$$(pwd)/node_modules/.bin:$$PATH && \
+		cd src && \
+			sysconfcpus -n 1 \
+			elm-analyse -s
 
 clean:  # Remove all elm/node related directories
 	rm -rf ./elm-stuff ./node_modules ./src/elm-stuff ./tests/elm-stuff
