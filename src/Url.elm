@@ -61,6 +61,11 @@ parseChar c ( formater, writer ) =
             )
                 |> checkConvert c
 
+        ( _, _, Reader.EOF ) ->
+            ( formater
+            , writer
+            )
+
         ( _, _, c ) ->
             ( formater
             , writer |> Writer.appendToBuffer (toChar c)

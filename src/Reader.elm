@@ -16,6 +16,7 @@ type InputChar
     | QuestionMark
     | Escaped Char
     | Common Char
+    | EOF
 
 
 type alias Reader =
@@ -43,6 +44,9 @@ parseChar c reader =
 toChar : InputChar -> Char
 toChar v =
     case v of
+        EOF ->
+            '\x00'
+
         LBrace ->
             '{'
 

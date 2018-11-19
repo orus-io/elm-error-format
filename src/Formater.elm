@@ -53,6 +53,13 @@ read c ( reader, ( formater, writer ) ) =
         ( newReader, ( newFormater, newWriter ) )
 
 
+eof :
+    ( Reader, ( Formater, Writer msg ) )
+    -> ( Reader, ( Formater, Writer msg ) )
+eof ( reader, ( formater, writer ) ) =
+    ( reader, parseInputChar Reader.EOF ( formater, writer ) )
+
+
 
 -- Formater
 
@@ -332,7 +339,7 @@ parseInputChar c ( formater, writer ) =
                 ( newJsonFormater, newWriter ) =
                     if endOfJson then
                         {- Exit Json -}
-                        Json.parseEOF ( jsonFormater, writer )
+                        Json.parseChar Reader.EOF ( jsonFormater, writer )
                     else
                         Json.parseChar c ( jsonFormater, writer )
             in
@@ -356,7 +363,7 @@ parseInputChar c ( formater, writer ) =
                 ( newJsonFormater, newWriter ) =
                     if endOfJson then
                         {- Exit Json -}
-                        Json.parseEOF ( jsonFormater, writer )
+                        Json.parseChar Reader.EOF ( jsonFormater, writer )
                     else
                         Json.parseChar c ( jsonFormater, writer )
             in
@@ -400,18 +407,14 @@ parseInputChar c ( formater, writer ) =
                 , newWriter
                 )
 
+        ( _, Reader.EOF ) ->
+            ( formater
+            , writer
+                |> Writer.flushBufferAsText
+                >> Writer.flushCurrentLine
+            )
+
         ( _, c ) ->
             ( formater
             , writer |> Writer.appendToBuffer (toChar c)
             )
-
-
-parseEOF : ( Reader, ( Formater, Writer msg ) ) -> ( Reader, ( Formater, Writer msg ) )
-parseEOF ( reader, ( formater, writer ) ) =
-    ( reader
-    , ( formater
-      , writer
-            |> Writer.flushBufferAsText
-            >> Writer.flushCurrentLine
-      )
-    )

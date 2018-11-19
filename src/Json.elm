@@ -138,16 +138,14 @@ parseChar c ( formater, writer ) =
                 |> Writer.appendToBuffer (Reader.toChar <| Reader.Escaped c)
             )
 
+        ( _, Reader.EOF ) ->
+            ( formater
+            , writer
+                |> Writer.flushBufferAsText
+            )
+
         ( _, c ) ->
             ( formater
             , writer
                 |> Writer.appendToBuffer (Reader.toChar c)
             )
-
-
-parseEOF : ( Formater, Writer msg ) -> ( Formater, Writer msg )
-parseEOF ( formater, writer ) =
-    ( formater
-    , writer
-        |> Writer.flushBufferAsText
-    )

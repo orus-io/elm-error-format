@@ -47,7 +47,7 @@ formatErrString error =
           )
         )
         error
-        |> Formater.parseEOF
+        |> Formater.eof
         |> Tuple.second
         |> Tuple.second
         |> Writer.render
