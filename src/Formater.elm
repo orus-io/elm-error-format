@@ -41,7 +41,27 @@ read :
     Char
     -> ( Reader, ( Formater, Writer msg ) )
     -> ( Reader, ( Formater, Writer msg ) )
-read c ( reader, ( formater, writer ) ) =
+read =
+    formaterRead parseInputChar
+
+
+eof :
+    ( Reader, ( Formater, Writer msg ) )
+    -> ( Reader, ( Formater, Writer msg ) )
+eof ( reader, ( formater, writer ) ) =
+    ( reader, parseInputChar Reader.EOF ( formater, writer ) )
+
+
+
+-- generic formater entry points
+
+
+formaterRead :
+    (InputChar -> ( formater, Writer msg ) -> ( formater, Writer msg ))
+    -> Char
+    -> ( Reader, ( formater, Writer msg ) )
+    -> ( Reader, ( formater, Writer msg ) )
+formaterRead parseInputChar c ( reader, ( formater, writer ) ) =
     let
         ( newReader, nextChar ) =
             Reader.parseChar c reader
@@ -55,13 +75,6 @@ read c ( reader, ( formater, writer ) ) =
                     ( formater, writer )
     in
         ( newReader, ( newFormater, newWriter ) )
-
-
-eof :
-    ( Reader, ( Formater, Writer msg ) )
-    -> ( Reader, ( Formater, Writer msg ) )
-eof ( reader, ( formater, writer ) ) =
-    ( reader, parseInputChar Reader.EOF ( formater, writer ) )
 
 
 
