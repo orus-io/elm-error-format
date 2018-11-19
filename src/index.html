@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width" />
+        <title>Demo</title>
+        <link rel="icon" href="https://upload.wikimedia.org/wikipedia/commons/thumb/8/8b/Copyleft.svg/145px-Copyleft.svg.png" sizes="32x32" />
+        <style type="text/css" media="screen">
+body { background: black; padding: 0; margin: 0; color: gray;}
+.flex-grid { display: flex; max-width: 80vw; margin: auto; padding-top: 3rem;}
+.col { flex: 1; padding: 0 10px; }
+.error div > div:hover { background: rgba(34, 34, 107, 0.52) }
+h1 { text-align: center; }
+textarea { height: 5rem; width: 100%; background: black; color: gray; border: 1px solid gray; }
+        </style>
+    </head>
+    <!-- Dark mode
+        <body style="background:black;">
+    -->
+    <body>
+        <h1>- Playground -</h1>
+        <div id="elm" class="name"> </div>
+        <script src="app.js" charset="utf-8"></script>
+        <script>
+            var app = Elm.Main.embed(
+                document.getElementById('elm')
+            );
+        </script>
+    </body>
+</html>
