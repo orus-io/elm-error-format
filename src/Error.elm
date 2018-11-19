@@ -1,7 +1,7 @@
 module Error exposing (..)
 
 import Html exposing (Html, Attribute, div, text, span)
-import Html.Attributes exposing (style)
+import Html.Attributes exposing (style, class)
 import Formater exposing (Formater)
 import Reader
 import Writer exposing (Writer)
@@ -32,6 +32,7 @@ view model =
                , ( "color", "grey" )
             -}
             ]
+        , class "error"
         ]
         [ formatErrString model ]
 

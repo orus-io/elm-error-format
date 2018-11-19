@@ -188,8 +188,9 @@ parseInputChar c ( formater, writer ) =
             )
 
         ( FirstChar, Reader.Escaped c ) ->
-            ( formater
+            ( { formater | stringState = InString }
             , writer
+                |> Writer.appendToBuffer '"'
                 |> Writer.appendToBuffer '\\'
                 |> Writer.appendToBuffer c
             )
@@ -226,8 +227,9 @@ parseInputChar c ( formater, writer ) =
                     Json.parseChar Reader.LBracket
                         ( Json.init Json.defaultOptions
                         , writer
-                            |> Writer.appendToBuffer '`'
-                            >> Writer.flushBufferAsText
+                            |> Writer.appendToBuffer '"'
+                            >> Writer.flushBufferAsColoredText
+                                formater.options.stringColor
                         )
             in
                 ( { formater | stringState = JsonString jsonFormater }

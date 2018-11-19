@@ -18,7 +18,7 @@ type alias Options =
 
 defaultOptions : Options
 defaultOptions =
-    { stringColor = "#0066a7" }
+    { stringColor = "orangered" }
 
 
 type alias Formater =
@@ -111,12 +111,7 @@ parseChar c ( formater, writer ) =
                 | inString = True
               }
             , writer
-                |> Writer.appendToBuffer '"'
-            )
-
-        ( True, Reader.DoubleQuote ) ->
-            ( formater
-            , writer
+                |> Writer.flushBufferAsText
                 |> Writer.appendToBuffer '"'
             )
 

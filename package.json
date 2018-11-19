@@ -1,0 +1,9 @@
+{
+  "dependencies": {
+    "elm": "^0.18.0",
+    "elm-analyse": "^0.15.0",
+    "elm-coverage": "^0.1.7",
+    "elm-live": "^3.2.0",
+    "elm-test": "^0.18.0"
+  }
+}

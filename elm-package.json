@@ -6,15 +6,7 @@
     "source-directories": [
         "src/"
     ],
-    "exposed-modules": [
-        "Buffer",
-        "Error",
-        "Formater",
-        "Json",
-        "Reader",
-        "Url",
-        "Writer"
-    ],
+    "exposed-modules": ["Error"],
     "dependencies": {
         "elm-lang/core": "5.1.1 <= v < 6.0.0",
         "elm-lang/html": "2.0.0 <= v < 3.0.0"
