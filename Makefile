@@ -6,7 +6,6 @@ help:  ## Display this help message
 run:  ## Run demo app
 	export PATH=$$(pwd)/node_modules/.bin:$$PATH && \
 		cd demo && \
-			sysconfcpus -n 1 \
 			elm-live \
 			--port=8044 \
 			--pushstate \
@@ -18,18 +17,15 @@ run:  ## Run demo app
 
 test:  ## Run tests
 	export PATH=$$(pwd)/node_modules/.bin:$$PATH && \
-		sysconfcpus -n 1 \
 		elm-test
 
 coverage:  ## Run tests with coverage
 	export PATH=$$(pwd)/node_modules/.bin:$$PATH && \
-		sysconfcpus -n 1 \
 		elm-coverage --open
 
 analyse:  ## Analyse source with elm-analyse
 	export PATH=$$(pwd)/node_modules/.bin:$$PATH && \
 		cd src && \
-			sysconfcpus -n 1 \
 			elm-analyse -s
 
 clean:  # Remove all elm/node related directories
