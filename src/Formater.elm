@@ -39,11 +39,11 @@ read :
     -> ( Reader, ( Formater, Writer msg ) )
 read c ( reader, ( formater, writer ) ) =
     let
-        newReader =
+        ( newReader, nextChar ) =
             Reader.parseChar c reader
 
         ( newFormater, newWriter ) =
-            case newReader.current of
+            case nextChar of
                 Just i ->
                     parseInputChar i ( formater, writer )
 

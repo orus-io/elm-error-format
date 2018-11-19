@@ -19,45 +19,25 @@ type InputChar
 
 
 type alias Reader =
-    { nextIsEscaped : Bool
-    , current : Maybe InputChar
-    }
+    Bool
 
 
 new : Reader
 new =
-    { nextIsEscaped = False
-    , current = Nothing
-    }
+    False
 
 
-setCurrent : Maybe InputChar -> Reader -> Reader
-setCurrent v reader =
-    { reader | current = v }
-
-
-setNextIsEscape : Bool -> Reader -> Reader
-setNextIsEscape v reader =
-    { reader | nextIsEscaped = v }
-
-
-parseChar : Char -> Reader -> Reader
+parseChar : Char -> Reader -> ( Reader, Maybe InputChar )
 parseChar c reader =
-    case c of
-        '\\' ->
-            reader
-                |> setNextIsEscape True
-                |> setCurrent Nothing
+    case ( reader, c ) of
+        ( False, '\\' ) ->
+            ( True, Nothing )
 
-        c ->
-            reader
-                |> setNextIsEscape False
-                |> setCurrent
-                    (if reader.nextIsEscaped then
-                        Just <| Escaped c
-                     else
-                        Just <| fromChar c
-                    )
+        ( True, _ ) ->
+            ( False, Just <| Escaped c )
+
+        ( False, _ ) ->
+            ( False, Just <| fromChar c )
 
 
 toChar : InputChar -> Char

@@ -125,6 +125,12 @@ parseChar c ( formater, writer ) =
                     formater.options.stringColor
             )
 
+        ( True, Reader.Escaped '\\' ) ->
+            ( formater
+            , writer
+                |> Writer.appendToBuffer '\\'
+            )
+
         ( True, Reader.Escaped c ) ->
             ( formater
             , writer
