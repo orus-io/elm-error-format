@@ -1,6 +1,6 @@
 module Main exposing (..)
 
-import Html exposing (Html, div, textarea, table, tr, td)
+import Html exposing (Html, div, textarea)
 import Html.Attributes exposing (class)
 import Html.Events exposing (onInput)
 import Error
