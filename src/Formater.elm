@@ -9,6 +9,7 @@ import Reader
         ( Reader
         , InputChar
         , toChar
+        , formaterRead
         )
 
 
@@ -49,32 +50,7 @@ eof :
     ( Reader, ( Formater, Writer msg ) )
     -> ( Reader, ( Formater, Writer msg ) )
 eof ( reader, ( formater, writer ) ) =
-    ( reader, parseInputChar Reader.EOF ( formater, writer ) )
-
-
-
--- generic formater entry points
-
-
-formaterRead :
-    (InputChar -> ( formater, Writer msg ) -> ( formater, Writer msg ))
-    -> Char
-    -> ( Reader, ( formater, Writer msg ) )
-    -> ( Reader, ( formater, Writer msg ) )
-formaterRead parseInputChar c ( reader, ( formater, writer ) ) =
-    let
-        ( newReader, nextChar ) =
-            Reader.parseChar c reader
-
-        ( newFormater, newWriter ) =
-            case nextChar of
-                Just i ->
-                    parseInputChar i ( formater, writer )
-
-                Nothing ->
-                    ( formater, writer )
-    in
-        ( newReader, ( newFormater, newWriter ) )
+    ( reader, parseChar Reader.EOF ( formater, writer ) )
 
 
 

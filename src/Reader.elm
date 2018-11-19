@@ -1,4 +1,15 @@
-module Reader exposing (Reader, InputChar(..), parseChar, toChar, new)
+module Reader
+    exposing
+        ( Reader
+        , InputChar(..)
+        , parseChar
+        , toChar
+        , new
+        , formaterRead
+        )
+
+import Writer exposing (Writer)
+
 
 -- Reader
 
@@ -26,6 +37,35 @@ type alias Reader =
 new : Reader
 new =
     False
+
+
+
+-- generic formater entry points
+
+
+formaterRead :
+    (InputChar -> ( formater, Writer msg ) -> ( formater, Writer msg ))
+    -> Char
+    -> ( Reader, ( formater, Writer msg ) )
+    -> ( Reader, ( formater, Writer msg ) )
+formaterRead parseInputChar c ( reader, ( formater, writer ) ) =
+    let
+        ( newReader, nextChar ) =
+            parseChar c reader
+
+        ( newFormater, newWriter ) =
+            case nextChar of
+                Just i ->
+                    parseInputChar i ( formater, writer )
+
+                Nothing ->
+                    ( formater, writer )
+    in
+        ( newReader, ( newFormater, newWriter ) )
+
+
+
+-- Parser
 
 
 parseChar : Char -> Reader -> ( Reader, Maybe InputChar )
