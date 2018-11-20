@@ -3,9 +3,23 @@ module Json exposing (..)
 import Writer exposing (Writer)
 import Reader
     exposing
-        ( InputChar
+        ( Reader
+        , InputChar
         , toChar
+        , formaterRead
         )
+
+
+-- Main
+
+
+read :
+    Char
+    -> ( Reader, ( Formater, Writer msg ) )
+    -> ( Reader, ( Formater, Writer msg ) )
+read =
+    formaterRead parseChar
+
 
 
 -- Json Formater
@@ -104,7 +118,7 @@ parseChar c ( formater, writer ) =
                 >> Writer.flushCurrentLine
             )
 
-        ( False, Reader.Escaped '"' ) ->
+        ( False, Reader.DoubleQuote ) ->
             {- Enter Json inString -}
             ( { formater
                 | inString = True
@@ -114,7 +128,7 @@ parseChar c ( formater, writer ) =
                 |> Writer.appendToBuffer '"'
             )
 
-        ( True, Reader.Escaped '"' ) ->
+        ( True, Reader.DoubleQuote ) ->
             {- Exit Json inString -}
             ( { formater
                 | inString = False

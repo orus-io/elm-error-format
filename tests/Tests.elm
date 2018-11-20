@@ -144,7 +144,7 @@ all =
         , test "Should format Json string with escaped char" <|
             \_ ->
                 Expect.equal
-                    (Error.formatErrString "A = \"{\\\"with\\\": \\\"new \\n line and a BS \\\\ yeah\\\"}\"")
+                    (Error.formatErrString "A = \"{\\\"with\\\": \\\"new \\\\n line and a BS \\\\ yeah\\\"}\"")
                     (div []
                         [ div [ style [ ( "padding-left", "0rem" ) ] ]
                             [ text "A = "

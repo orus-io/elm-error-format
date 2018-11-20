@@ -24,7 +24,7 @@ type ComplexType
 
 type SubFormater
     = StringFmt
-    | JsonFmt Json.Formater
+    | JsonFmt Reader Json.Formater
     | UrlFmt Url.Formater
 
 
@@ -236,32 +236,42 @@ parseFirstChar c ( formater, writer ) =
         Reader.LBrace ->
             {- Enter JSON -}
             let
-                ( jsonFormater, newWriter ) =
-                    Json.parseChar Reader.LBrace
-                        ( Json.init Json.defaultOptions
-                        , writer
-                            |> Writer.appendToBuffer '"'
-                            >> Writer.flushBufferAsColoredText
-                                formater.options.stringColor
+                ( jsonReader, ( jsonFormater, newWriter ) ) =
+                    Json.read
+                        '{'
+                        ( Reader.new
+                        , ( Json.init Json.defaultOptions
+                          , writer
+                                |> Writer.appendToBuffer '"'
+                                >> Writer.flushBufferAsColoredText
+                                    formater.options.stringColor
+                          )
                         )
             in
-                ( { formater | stringState = InString <| JsonFmt jsonFormater }
+                ( { formater
+                    | stringState = InString <| JsonFmt jsonReader jsonFormater
+                  }
                 , newWriter
                 )
 
         Reader.LBracket ->
             {- Enter JSON -}
             let
-                ( jsonFormater, newWriter ) =
-                    Json.parseChar Reader.LBracket
-                        ( Json.init Json.defaultOptions
-                        , writer
-                            |> Writer.appendToBuffer '"'
-                            >> Writer.flushBufferAsColoredText
-                                formater.options.stringColor
+                ( jsonReader, ( jsonFormater, newWriter ) ) =
+                    Json.read
+                        '['
+                        ( Reader.new
+                        , ( Json.init Json.defaultOptions
+                          , writer
+                                |> Writer.appendToBuffer '"'
+                                >> Writer.flushBufferAsColoredText
+                                    formater.options.stringColor
+                          )
                         )
             in
-                ( { formater | stringState = InString <| JsonFmt jsonFormater }
+                ( { formater
+                    | stringState = InString <| JsonFmt jsonReader jsonFormater
+                  }
                 , newWriter
                 )
 
@@ -311,16 +321,21 @@ parseInString c ( formater, writer ) =
         Reader.LBrace ->
             {- Enter JSON -}
             let
-                ( jsonFormater, newWriter ) =
-                    Json.parseChar Reader.LBrace
-                        ( Json.init Json.defaultOptions
-                        , writer
-                            |> Writer.appendToBuffer '"'
-                            >> Writer.flushBufferAsColoredText
-                                formater.options.stringColor
+                ( jsonReader, ( jsonFormater, newWriter ) ) =
+                    Json.read
+                        '{'
+                        ( Reader.new
+                        , ( Json.init Json.defaultOptions
+                          , writer
+                                |> Writer.appendToBuffer '"'
+                                >> Writer.flushBufferAsColoredText
+                                    formater.options.stringColor
+                          )
                         )
             in
-                ( { formater | stringState = InString <| JsonFmt jsonFormater }
+                ( { formater
+                    | stringState = InString <| JsonFmt jsonReader jsonFormater
+                  }
                 , newWriter
                 )
 
@@ -352,66 +367,25 @@ parseInString c ( formater, writer ) =
 
 
 parseJsonString :
-    Json.Formater
+    Reader
+    -> Json.Formater
     -> InputChar
     -> ( Formater, Writer msg )
     -> ( Formater, Writer msg )
-parseJsonString jsonFormater c ( formater, writer ) =
+parseJsonString jsonReader jsonFormater c ( formater, writer ) =
     case c of
-        Reader.Escaped '\\' ->
-            let
-                ( newJsonFormater, newWriter ) =
-                    Json.parseChar (Reader.Escaped '\\') ( jsonFormater, writer )
-            in
-                ( { formater
-                    | stringState = InString <| JsonFmt newJsonFormater
-                  }
-                , newWriter
-                )
-
-        Reader.Escaped '"' ->
-            let
-                ( newJsonFormater, newWriter ) =
-                    Json.parseChar
-                        (Reader.Escaped '"')
-                        ( jsonFormater, writer )
-            in
-                ( { formater
-                    | stringState = InString <| JsonFmt newJsonFormater
-                  }
-                , newWriter
-                )
-
         Reader.DoubleQuote ->
+            {- Exit Json -}
             let
-                endOfJson =
-                    List.isEmpty jsonFormater.contextStack
-
-                ( newJsonFormater, newWriter ) =
-                    if endOfJson then
-                        {- Exit Json -}
-                        Json.parseChar Reader.EOF ( jsonFormater, writer )
-                    else
-                        Json.parseChar c ( jsonFormater, writer )
+                ( _, newWriter ) =
+                    Json.parseChar Reader.EOF ( jsonFormater, writer )
             in
-                if endOfJson then
-                    ( { formater | stringState = NoString }
-                    , newWriter
-                        |> Writer.appendToBuffer '"'
-                        >> Writer.flushBufferAsColoredText
-                            formater.options.stringColor
-                    )
-                else
-                    ( { formater | stringState = InString <| JsonFmt newJsonFormater }
-                    , newWriter
-                    )
-
-        Reader.Escaped c ->
-            ( formater
-            , writer
-                |> Writer.appendToBuffer '\\'
-                |> Writer.appendToBuffer c
-            )
+                ( { formater | stringState = NoString }
+                , newWriter
+                    |> Writer.appendToBuffer '"'
+                    >> Writer.flushBufferAsColoredText
+                        formater.options.stringColor
+                )
 
         Reader.EOF ->
             ( formater
@@ -420,25 +394,42 @@ parseJsonString jsonFormater c ( formater, writer ) =
                 >> Writer.flushCurrentLine
             )
 
-        c ->
+        Reader.Escaped c ->
             let
-                endOfJson =
-                    List.isEmpty jsonFormater.contextStack
-
-                ( newJsonFormater, newWriter ) =
-                    if endOfJson then
-                        {- Exit Json -}
-                        Json.parseChar Reader.EOF ( jsonFormater, writer )
-                    else
-                        Json.parseChar c ( jsonFormater, writer )
+                ( newJsonReader, ( newJsonFormater, newWriter ) ) =
+                    Json.read c ( jsonReader, ( jsonFormater, writer ) )
             in
-                if endOfJson then
+                ( { formater
+                    | stringState =
+                        InString <|
+                            JsonFmt newJsonReader newJsonFormater
+                  }
+                , newWriter
+                )
+
+        c ->
+            if List.isEmpty jsonFormater.contextStack then
+                let
+                    {- Exit Json -}
+                    ( _, newWriter ) =
+                        Json.parseChar Reader.EOF ( jsonFormater, writer )
+                in
                     ( { formater | stringState = InString StringFmt }
                     , newWriter
                         |> Writer.appendToBuffer (toChar c)
                     )
-                else
-                    ( { formater | stringState = InString <| JsonFmt newJsonFormater }
+            else
+                let
+                    ( newJsonReader, ( newJsonFormater, newWriter ) ) =
+                        Json.read
+                            (toChar c)
+                            ( jsonReader, ( jsonFormater, writer ) )
+                in
+                    ( { formater
+                        | stringState =
+                            InString <|
+                                JsonFmt newJsonReader newJsonFormater
+                      }
                     , newWriter
                     )
 
@@ -500,8 +491,8 @@ parseChar c ( formater, writer ) =
         InString StringFmt ->
             parseInString c ( formater, writer )
 
-        InString (JsonFmt jsonFormater) ->
-            parseJsonString jsonFormater c ( formater, writer )
+        InString (JsonFmt jsonReader jsonFormater) ->
+            parseJsonString jsonReader jsonFormater c ( formater, writer )
 
         InString (UrlFmt urlFormater) ->
             parseUrlString urlFormater c ( formater, writer )
