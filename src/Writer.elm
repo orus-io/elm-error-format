@@ -65,9 +65,12 @@ appendSingleSpace w =
 
 writeText : String -> Writer msg -> Writer msg
 writeText s w =
-    { w
-        | currentLine = List.append w.currentLine [ text s ]
-    }
+    if String.isEmpty s then
+        w
+    else
+        { w
+            | currentLine = List.append w.currentLine [ text s ]
+        }
 
 
 writeColoredText : String -> String -> Writer msg -> Writer msg
@@ -119,12 +122,15 @@ padding indent =
 
 flushCurrentLine : Writer msg -> Writer msg
 flushCurrentLine w =
-    { w
-        | output =
-            List.append w.output
-                [ div [ padding w.indent ] w.currentLine ]
-        , currentLine = []
-    }
+    if List.isEmpty w.currentLine then
+        w
+    else
+        { w
+            | output =
+                List.append w.output
+                    [ div [ padding w.indent ] w.currentLine ]
+            , currentLine = []
+        }
 
 
 render : Writer msg -> Html msg

@@ -36,7 +36,6 @@ all =
                         , div [ style [ ( "padding-left", "2rem" ) ] ] [ text "}" ]
                         , div [ style [ ( "padding-left", "1rem" ) ] ] [ text " " ]
                         , div [ style [ ( "padding-left", "1rem" ) ] ] [ text "}" ]
-                        , div [ style [ ( "padding-left", "0rem" ) ] ] [ text "" ]
                         ]
                     )
         , test "Should format string" <|
@@ -47,7 +46,6 @@ all =
                         [ div [ style [ ( "padding-left", "0rem" ) ] ]
                             [ text "A = "
                             , span [ style [ ( "color", elmColor ) ] ] [ text "\"Elm Rox!\"" ]
-                            , text ""
                             ]
                         ]
                     )
@@ -63,7 +61,6 @@ all =
                             ]
                         , div [ style [ ( "padding-left", "1rem" ) ] ] [ text "{ B = 1 " ]
                         , div [ style [ ( "padding-left", "1rem" ) ] ] [ text "}" ]
-                        , div [ style [ ( "padding-left", "0rem" ) ] ] [ text "" ]
                         ]
                     )
         , test "Should preserve escaped char in string" <|
@@ -74,7 +71,6 @@ all =
                         [ div [ style [ ( "padding-left", "0rem" ) ] ]
                             [ text "A = "
                             , span [ style [ ( "color", elmColor ) ] ] [ text "\"\\n two \\n newline\"" ]
-                            , text ""
                             ]
                         ]
                     )
@@ -86,7 +82,6 @@ all =
                         [ div [ style [ ( "padding-left", "0rem" ) ] ]
                             [ text "A = "
                             , span [ style [ ( "color", elmColor ) ] ] [ text "\"Elm Rox!\\\n \\\"More than you expect\\\"\"" ]
-                            , text ""
                             ]
                         ]
                     )
@@ -101,15 +96,12 @@ all =
                             , text "{"
                             ]
                         , div [ style [ ( "padding-left", "1rem" ) ] ]
-                            [ text ""
-                            , span [ style [ ( "color", jsColor ) ] ] [ text "\"answer\"" ]
+                            [ span [ style [ ( "color", jsColor ) ] ] [ text "\"answer\"" ]
                             , text ": 42"
                             ]
                         , div [ style [ ( "padding-left", "0rem" ) ] ]
                             [ text "}"
-                            , text ""
                             , span [ style [ ( "color", elmColor ) ] ] [ text "\"" ]
-                            , text ""
                             ]
                         ]
                     )
@@ -124,20 +116,15 @@ all =
                             , text "["
                             ]
                         , div [ style [ ( "padding-left", "1rem" ) ] ]
-                            [ text ""
-                            , span [ style [ ( "color", jsColor ) ] ] [ text "\"answer\"" ]
+                            [ span [ style [ ( "color", jsColor ) ] ] [ text "\"answer\"" ]
                             , text ","
                             ]
-                        , div [ style [ ( "padding-left", "1rem" ) ] ]
-                            []
                         , div [ style [ ( "padding-left", "1rem" ) ] ]
                             [ text " 42"
                             ]
                         , div [ style [ ( "padding-left", "0rem" ) ] ]
                             [ text "]"
-                            , text ""
                             , span [ style [ ( "color", elmColor ) ] ] [ text "\"" ]
-                            , text ""
                             ]
                         ]
                     )
@@ -152,17 +139,13 @@ all =
                             , text "{"
                             ]
                         , div [ style [ ( "padding-left", "1rem" ) ] ]
-                            [ text ""
-                            , span [ style [ ( "color", jsColor ) ] ] [ text "\"with\"" ]
+                            [ span [ style [ ( "color", jsColor ) ] ] [ text "\"with\"" ]
                             , text ": "
                             , span [ style [ ( "color", jsColor ) ] ] [ text "\"new \\n line and a BS \\ yeah\"" ]
-                            , text ""
                             ]
                         , div [ style [ ( "padding-left", "0rem" ) ] ]
                             [ text "}"
-                            , text ""
                             , span [ style [ ( "color", elmColor ) ] ] [ text "\"" ]
-                            , text ""
                             ]
                         ]
                     )
@@ -177,15 +160,12 @@ all =
                             , text "{"
                             ]
                         , div [ style [ ( "padding-left", "1rem" ) ] ]
-                            [ text ""
-                            , span [ style [ ( "color", jsColor ) ] ] [ text "\"answer\"" ]
+                            [ span [ style [ ( "color", jsColor ) ] ] [ text "\"answer\"" ]
                             , text ": 42"
                             ]
                         , div [ style [ ( "padding-left", "0rem" ) ] ]
                             [ text "}"
-                            , text ""
                             , span [ style [ ( "color", elmColor ) ] ] [ text "\"" ]
-                            , text ""
                             ]
                         ]
                     )
@@ -198,7 +178,6 @@ all =
                             [ text "A = "
                             , span [ style [ ( "color", elmColor ) ] ] [ text "\"http://orus.io?q=\"query\"\"" ]
                             ]
-                        , div [ style [ ( "padding-left", "0rem" ) ] ] [ text "" ]
                         ]
                     )
         ]
