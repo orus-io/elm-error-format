@@ -197,13 +197,6 @@ parseNoString c ( formater, writer ) =
                 |> Writer.appendToBuffer c
             )
 
-        Reader.EOF ->
-            ( formater
-            , writer
-                |> Writer.flushBufferAsText
-                >> Writer.flushCurrentLine
-            )
-
         c ->
             ( formater
             , writer |> Writer.appendToBuffer (toChar c)
@@ -275,13 +268,6 @@ parseFirstChar c ( formater, writer ) =
                 , newWriter
                 )
 
-        Reader.EOF ->
-            ( formater
-            , writer
-                |> Writer.flushBufferAsText
-                >> Writer.flushCurrentLine
-            )
-
         c ->
             ( { formater | stringState = InString StringFmt }
             , writer
@@ -339,13 +325,6 @@ parseInString c ( formater, writer ) =
                 , newWriter
                 )
 
-        Reader.EOF ->
-            ( formater
-            , writer
-                |> Writer.flushBufferAsText
-                >> Writer.flushCurrentLine
-            )
-
         c ->
             if
                 not (Buffer.isEmpty writer.buffer)
@@ -387,17 +366,10 @@ parseJsonString jsonReader jsonFormater c ( formater, writer ) =
                         formater.options.stringColor
                 )
 
-        Reader.EOF ->
-            ( formater
-            , writer
-                |> Writer.flushBufferAsText
-                >> Writer.flushCurrentLine
-            )
-
         c ->
             if List.isEmpty jsonFormater.contextStack then
+                {- Exit Json -}
                 let
-                    {- Exit Json -}
                     ( _, newWriter ) =
                         Json.parseChar Reader.EOF ( jsonFormater, writer )
                 in
@@ -447,13 +419,6 @@ parseUrlString urlFormater c ( formater, writer ) =
                 |> Writer.appendToBuffer c
             )
 
-        Reader.EOF ->
-            ( formater
-            , writer
-                |> Writer.flushBufferAsText
-                >> Writer.flushCurrentLine
-            )
-
         c ->
             let
                 ( newUrlFormater, newWriter ) =
@@ -468,18 +433,25 @@ parseUrlString urlFormater c ( formater, writer ) =
 
 parseChar : InputChar -> ( Formater, Writer msg ) -> ( Formater, Writer msg )
 parseChar c ( formater, writer ) =
-    case formater.stringState of
-        NoString ->
+    case ( formater.stringState, c ) of
+        ( _, Reader.EOF ) ->
+            ( formater
+            , writer
+                |> Writer.flushBufferAsText
+                >> Writer.flushCurrentLine
+            )
+
+        ( NoString, _ ) ->
             parseNoString c ( formater, writer )
 
-        FirstChar ->
+        ( FirstChar, _ ) ->
             parseFirstChar c ( formater, writer )
 
-        InString StringFmt ->
+        ( InString StringFmt, _ ) ->
             parseInString c ( formater, writer )
 
-        InString (JsonFmt jsonReader jsonFormater) ->
+        ( InString (JsonFmt jsonReader jsonFormater), _ ) ->
             parseJsonString jsonReader jsonFormater c ( formater, writer )
 
-        InString (UrlFmt urlFormater) ->
+        ( InString (UrlFmt urlFormater), _ ) ->
             parseUrlString urlFormater c ( formater, writer )
