@@ -394,19 +394,6 @@ parseJsonString jsonReader jsonFormater c ( formater, writer ) =
                 >> Writer.flushCurrentLine
             )
 
-        Reader.Escaped c ->
-            let
-                ( newJsonReader, ( newJsonFormater, newWriter ) ) =
-                    Json.read c ( jsonReader, ( jsonFormater, writer ) )
-            in
-                ( { formater
-                    | stringState =
-                        InString <|
-                            JsonFmt newJsonReader newJsonFormater
-                  }
-                , newWriter
-                )
-
         c ->
             if List.isEmpty jsonFormater.contextStack then
                 let
